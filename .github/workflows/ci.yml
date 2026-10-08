@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  check-and-unit:
+    name: Syntaxe + tests unitaires
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Dépendances
+        run: npm ci
+      - name: Vérification de syntaxe (source + tests)
+        run: |
+          for f in src/main/*.js src/renderer/*.js src/preload.js test/*.js test/unit/*.js; do
+            node --check "$f" || exit 1
+          done
+      - name: Tests unitaires (sans Electron)
+        run: npm run test:unit
+
+  smoke:
+    name: Smoke (Electron, interface complète)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Dépendances système Electron (Ubuntu)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb libgtk-3-0 libnss3 libgbm1 libasound2t64 libasound2 libxss1 libx11-xcb1
+      - name: Dépendances
+        run: npm ci
+      - name: Smoke complet (fenêtres masquées, sous xvfb)
+        run: xvfb-run -a npm test

@@ -1,0 +1,4 @@
+{
+  "publicPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAVTcbq0lHEqGzmxADXhOo9DjI7aI5KCs4f6fUoyY2cpg=\n-----END PUBLIC KEY-----\n",
+  "note": "Clé publique EMBARQUÉE dans l'application : sert à vérifier les clés de licence. Ne jamais y mettre la clé privée. Régénéré par : node tools/license.js init"
+}

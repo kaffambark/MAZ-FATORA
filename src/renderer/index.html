@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: file:;">
+  <title>MAZ-FATORA</title>
+  <link rel="icon" type="image/png" href="../../Icon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Sprite d'icônes (SVG inline, embarqué — pas de CDN, conforme CSP) -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <symbol id="i-dash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></symbol>
+      <symbol id="i-import" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></symbol>
+      <symbol id="i-tx" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></symbol>
+      <symbol id="i-drafts" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></symbol>
+      <symbol id="i-invoices" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></symbol>
+      <symbol id="i-payments" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></symbol>
+      <symbol id="i-clients" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+      <symbol id="i-rules" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></symbol>
+      <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+      <symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></symbol>
+      <symbol id="i-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></symbol>
+      <symbol id="i-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></symbol>
+      <symbol id="i-zap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></symbol>
+      <symbol id="i-db" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></symbol>
+      <symbol id="i-box" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></symbol>
+      <symbol id="i-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></symbol>
+      <symbol id="i-print" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></symbol>
+      <symbol id="i-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></symbol>
+      <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></symbol>
+      <symbol id="i-arrow-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></symbol>
+      <symbol id="i-arrow-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="7" x2="17" y2="17"/><polyline points="17 7 17 17 7 17"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></symbol>
+      <symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></symbol>
+      <symbol id="i-rotate" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></symbol>
+      <symbol id="i-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></symbol>
+    </defs>
+  </svg>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand"><img class="brand-logo" src="../../Logo.png" alt="MAZ-FATORA"></div>
+      <nav class="nav">
+        <button class="nav-item active" data-view="dashboard">
+          <svg class="ic"><use href="#i-dash"/></svg><span class="nav-label" data-i18n="nav.dashboard">Tableau de bord</span>
+        </button>
+        <button class="nav-item" data-view="import">
+          <svg class="ic"><use href="#i-import"/></svg><span class="nav-label" data-i18n="nav.import">Import relevé bancaire</span>
+        </button>
+        <button class="nav-item" data-view="transactions">
+          <svg class="ic"><use href="#i-tx"/></svg><span class="nav-label" data-i18n="nav.transactions">Transactions</span>
+        </button>
+        <button class="nav-item" data-view="drafts">
+          <svg class="ic"><use href="#i-drafts"/></svg><span class="nav-label" data-i18n="nav.drafts">Factures à valider</span><span class="badge" id="nav-drafts-count">0</span>
+        </button>
+        <button class="nav-item" data-view="invoices">
+          <svg class="ic"><use href="#i-invoices"/></svg><span class="nav-label" data-i18n="nav.invoices">Factures validées</span>
+        </button>
+        <button class="nav-item" data-view="payments">
+          <svg class="ic"><use href="#i-payments"/></svg><span class="nav-label" data-i18n="nav.payments">Paiements</span>
+        </button>
+        <button class="nav-item" data-view="clients">
+          <svg class="ic"><use href="#i-clients"/></svg><span class="nav-label" data-i18n="nav.clients">Clients</span>
+        </button>
+        <button class="nav-item" data-view="rules">
+          <svg class="ic"><use href="#i-rules"/></svg><span class="nav-label" data-i18n="nav.rules">Règles automatiques</span>
+        </button>
+        <button class="nav-item" data-view="settings">
+          <svg class="ic"><use href="#i-settings"/></svg><span class="nav-label" data-i18n="nav.settings">Paramètres</span>
+        </button>
+      </nav>
+
+      <div class="lang-switch" role="group" data-i18n-aria="lang.label" aria-label="Langue">
+        <button class="lang-btn active" type="button" data-lang="fr">FR</button>
+        <button class="lang-btn" type="button" data-lang="ar">العربية</button>
+      </div>
+
+      <div class="sidebar-footer">
+        <button class="theme-btn" id="btn-theme" type="button"
+          data-i18n-aria="ui.themeToDark" data-i18n-title="ui.themeToDark"
+          aria-label="Passer en thème sombre" title="Passer en thème sombre">
+          <svg class="ic"><use href="#i-moon"/></svg>
+        </button>
+        <button class="btn small block" id="btn-lock" hidden data-i18n="sec.lock">Verrouiller</button>
+        <div class="company-name" id="sidebar-company">Société non configurée</div>
+        <div class="muted small" id="app-version"></div>
+      </div>
+    </aside>
+
+    <main class="content">
+
+      <!-- TABLEAU DE BORD -->
+      <section id="view-dashboard" class="view active">
+        <header class="view-header">
+          <h1 data-i18n="dash.title">Tableau de bord</h1>
+          <div class="actions">
+            <label class="month-pick" data-i18n-aria="dash.month" aria-label="Mois">
+              <span data-i18n="dash.month">Mois</span>
+              <input type="month" id="dash-month">
+            </label>
+            <button class="btn primary" data-goto="import">
+              <svg class="ic"><use href="#i-import"/></svg><span data-i18n="dash.import">Importer un relevé</span>
+            </button>
+            <button class="btn" id="btn-new-invoice-dash">
+              <svg class="ic"><use href="#i-plus"/></svg><span data-i18n="drafts.new">Nouvelle facture</span>
+            </button>
+            <button class="btn" data-goto="drafts">
+              <svg class="ic"><use href="#i-drafts"/></svg><span data-i18n="dash.seeDrafts">Voir les factures à valider</span>
+            </button>
+          </div>
+        </header>
+
+        <!-- Onboarding : première configuration de l'entreprise -->
+        <div class="card welcome" id="welcome-banner" hidden>
+          <div class="welcome-ic"><svg class="ic"><use href="#i-home"/></svg></div>
+          <div class="welcome-body">
+            <h2 data-i18n="dash.welcomeTitle">Bienvenue dans MAZ-FATORA</h2>
+            <p data-i18n="dash.welcomeText">Configurez votre entreprise : nom, ICE, TVA et logo — ils apparaissent sur vos factures et vos exports comptables.</p>
+          </div>
+          <div class="welcome-actions">
+            <button class="btn primary" data-goto="settings" data-i18n="dash.goSettings">Configurer mon entreprise</button>
+            <button class="btn" id="btn-hide-welcome" data-i18n="dash.hideWelcome">Plus tard</button>
+          </div>
+        </div>
+
+        <div class="stats">
+          <div class="stat card">
+            <span class="stat-label" data-i18n="dash.statDrafts">Factures à valider</span>
+            <span class="stat-value" id="stat-drafts">0</span>
+            <span class="stat-sub" id="stat-drafts-total">0,00 MAD</span>
+          </div>
+          <div class="stat card">
+            <span class="stat-label" data-i18n="dash.statValidated">Validées ce mois</span>
+            <span class="stat-value" id="stat-validated">0</span>
+            <span class="stat-sub" id="stat-validated-total">0,00 MAD</span>
+          </div>
+          <div class="stat card">
+            <span class="stat-label" data-i18n="pay.statDue">Reste à encaisser</span>
+            <span class="stat-value money" id="stat-due">0,00 MAD</span>
+            <span class="stat-sub" id="stat-due-sub"></span>
+          </div>
+          <div class="stat card">
+            <span class="stat-label" data-i18n="dash.statCredits">Encaissements importés</span>
+            <span class="stat-value" id="stat-credits">0</span>
+            <span class="stat-sub" id="stat-credits-total">0,00 MAD</span>
+          </div>
+          <div class="stat card">
+            <span class="stat-label" data-i18n="dash.statPending">Transactions en attente</span>
+            <span class="stat-value" id="stat-pending">0</span>
+            <span class="stat-sub" data-i18n="dash.statPendingSub">à rapprocher ou ignorer</span>
+          </div>
+        </div>
+
+        <div class="cards-charts">
+          <div class="card chart-card">
+            <div class="card-head"><h2 data-i18n="dash.chartTitle">Chiffre d'affaires des 12 derniers mois</h2></div>
+            <div class="chart-bars" id="chart-bars"></div>
+          </div>
+          <div class="card chart-card donut-card">
+            <div class="card-head"><h2 data-i18n="dash.chartDonut">Encaissé vs à encaisser</h2></div>
+            <div class="donut-wrap" id="chart-donut"></div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-head"><h2 data-i18n="dash.toTreat">À traiter</h2><button class="btn small" data-goto="drafts" data-i18n="dash.seeAll">Tout voir</button></div>
+            <div id="dash-drafts" class="list"></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h2 data-i18n="dash.recent">Dernières factures validées</h2><button class="btn small" data-goto="invoices" data-i18n="dash.seeAll">Tout voir</button></div>
+            <div id="dash-recent" class="list"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- IMPORT -->
+      <section id="view-import" class="view">
+        <header class="view-header">
+          <h1 data-i18n="imp.title">Import de relevé bancaire</h1>
+        </header>
+
+        <div class="card">
+          <p class="hint" data-i18n-html="imp.hint">
+            Formats acceptés : <strong>PDF</strong> (relevé exporté par votre banque) ou <strong>CSV</strong>
+            (séparateur <code>;</code>, <code>,</code> ou tabulation, montants à la française « 1 234,56 MAD »,
+            suffixes <code>MAD</code> / <code>DH</code> acceptés).
+            Les colonnes Date, Libellé et Débit / Crédit (ou Montant) sont détectées automatiquement.
+          </p>
+          <div class="row">
+            <button class="btn primary" id="btn-pick-csv" data-i18n="imp.choose">Choisir un fichier (PDF ou CSV)…</button>
+            <span class="muted" id="csv-file-name"></span>
+          </div>
+        </div>
+
+        <div class="card" id="import-preview" hidden>
+          <div class="card-head"><h2 data-i18n="imp.preview">Prévisualisation de l'import</h2></div>
+          <div class="form-grid">
+            <label><span data-i18n="imp.periodFrom">Début de période</span>
+              <input type="date" id="import-from">
+            </label>
+            <label><span data-i18n="imp.periodTo">Fin de période</span>
+              <input type="date" id="import-to">
+            </label>
+          </div>
+          <div class="import-summary" id="import-summary"></div>
+          <p class="hint" data-i18n="imp.creditsOnly">Seuls les virements reçus (crédits) sont retenus : les débits du relevé sont écartés à l'import.</p>
+          <p class="hint" data-i18n="imp.periodHint">Seules les transactions dont la date figure dans la période choisie sont affichées puis importées — tout le reste du fichier est laissé de côté.</p>
+          <div class="table-wrap">
+            <table id="import-table"></table>
+          </div>
+          <div id="import-warnings"></div>
+          <div class="form-grid">
+            <label><span data-i18n="imp.issueDate">Date de facture</span>
+              <input type="date" id="import-issue-date">
+            </label>
+            <label><span data-i18n="imp.dueDate">Échéance (règlement)</span>
+              <input type="date" id="import-due-date">
+            </label>
+            <label><span data-i18n="imp.client">Client de la facture</span>
+              <select id="import-client"></select>
+            </label>
+            <label><span data-i18n="imp.tva">TVA des lignes (%)</span>
+              <select id="import-tva"></select>
+            </label>
+            <label class="check">
+              <input type="checkbox" id="opt-autogen" checked>
+              <span data-i18n="imp.autogen">Générer les factures à valider depuis les crédits (encaissements)</span>
+            </label>
+            <label class="check">
+              <input type="radio" name="import-mode" value="group" checked>
+              <span data-i18n="imp.modeGroup">Une seule facture avec plusieurs lignes</span>
+            </label>
+            <label class="check">
+              <input type="radio" name="import-mode" value="single">
+              <span data-i18n="imp.modeSingle">Une facture par encaissement</span>
+            </label>
+            <label class="check">
+              <input type="checkbox" id="opt-dedupe" checked>
+              <span data-i18n="imp.dedupe">Ignorer les transactions déjà importées</span>
+            </label>
+          </div>
+          <p class="hint" id="imp-issue-hint" data-i18n="imp.issueHint"></p>
+          <p class="hint" id="import-mode-hint" data-i18n="gen.msgRules" hidden></p>
+          <p class="hint" id="imp-desig-hint" hidden></p>
+          <div class="row">
+            <button class="btn primary" id="btn-do-import" data-i18n="imp.import">Importer</button>
+            <button class="btn" id="btn-cancel-import" data-i18n="common.cancel">Annuler</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- TRANSACTIONS -->
+      <section id="view-transactions" class="view">
+        <header class="view-header">
+          <h1 data-i18n="tx.title">Transactions</h1>
+          <div class="actions">
+            <button class="btn primary" id="btn-generate">
+              <svg class="ic"><use href="#i-zap"/></svg><span data-i18n="tx.generate">Générer des factures (période + client)</span>
+            </button>
+            <button class="btn" data-goto="import">
+              <svg class="ic"><use href="#i-import"/></svg><span data-i18n="tx.import">Importer</span>
+            </button>
+          </div>
+        </header>
+
+        <div class="card">
+          <div class="toolbar">
+            <input type="search" id="tx-search" data-i18n-ph="tx.search" placeholder="Rechercher un libellé…">
+            <select id="tx-filter">
+              <option value="all" data-i18n="tx.filterAll">Toutes</option>
+              <option value="new" data-i18n="tx.filterNew">Non traitées</option>
+              <option value="linked" data-i18n="tx.filterLinked">Liées à une facture</option>
+              <option value="ignored" data-i18n="tx.filterIgnored">Ignorées</option>
+              <option value="credit" data-i18n="tx.filterCredit">Crédits uniquement</option>
+              <option value="debit" data-i18n="tx.filterDebit">Débits uniquement</option>
+            </select>
+            <span class="muted" id="tx-count"></span>
+          </div>
+          <div class="table-wrap">
+            <table id="tx-table"></table>
+          </div>
+        </div>
+      </section>
+
+      <!-- FACTURES À VALIDER -->
+      <section id="view-drafts" class="view">
+        <header class="view-header">
+          <h1><span data-i18n="drafts.title">Factures à valider</span> <span class="badge big" id="drafts-count">0</span></h1>
+          <div class="actions">
+            <button class="btn primary" id="btn-new-invoice">
+              <svg class="ic"><use href="#i-plus"/></svg><span data-i18n="drafts.new">Nouvelle facture</span>
+            </button>
+            <button class="btn danger" id="btn-delete-all-drafts">
+              <svg class="ic"><use href="#i-trash"/></svg><span data-i18n="drafts.deleteAll">Tout supprimer</span>
+            </button>
+          </div>
+        </header>
+        <div class="card">
+          <p class="hint" data-i18n-html="drafts.hint">Ces factures sont générées depuis vos encaissements (ou créées manuellement). Vérifiez-les, puis cliquez sur <strong>Valider</strong> pour leur attribuer un numéro définitif et les exporter en PDF.</p>
+          <div class="table-wrap">
+            <table id="draft-table"></table>
+          </div>
+        </div>
+      </section>
+
+      <!-- FACTURES VALIDÉES -->
+      <section id="view-invoices" class="view">
+        <header class="view-header">
+          <h1 data-i18n="inv.title">Factures validées</h1>
+          <div class="actions">
+            <input type="search" id="inv-search" data-i18n-ph="inv.search" placeholder="Rechercher…">
+            <button class="btn primary" id="btn-new-invoice-inv">
+              <svg class="ic"><use href="#i-plus"/></svg><span data-i18n="drafts.new">Nouvelle facture</span>
+            </button>
+          </div>
+        </header>
+        <div class="card">
+          <div class="table-wrap">
+            <table id="inv-table"></table>
+          </div>
+        </div>
+      </section>
+
+      <!-- PAIEMENTS -->
+      <section id="view-payments" class="view">
+        <header class="view-header">
+          <h1 data-i18n="pay.title">Suivi des paiements</h1>
+          <div class="actions">
+            <input type="search" id="pay-search" data-i18n-ph="pay.search" placeholder="Rechercher une facture (n°, client)…">
+            <select id="pay-filter">
+              <option value="all" data-i18n="pay.filterAll">Toutes les factures</option>
+              <option value="unpaid" data-i18n="pay.filterUnpaid">Impayées</option>
+              <option value="partial" data-i18n="pay.filterPartial">Partiellement payées</option>
+              <option value="paid" data-i18n="pay.filterPaid">Payées</option>
+              <option value="late" data-i18n="pay.filterLate">En retard</option>
+            </select>
+          </div>
+        </header>
+
+        <div class="stats">
+          <div class="stat card">
+            <span class="stat-label" data-i18n="pay.statBilled">Facturé (validé)</span>
+            <span class="stat-value money" id="pay-stat-billed">0,00 MAD</span>
+            <span class="stat-sub" id="pay-stat-billed-sub"></span>
+          </div>
+          <div class="stat card">
+            <span class="stat-label" data-i18n="pay.statReceived">Encaissé</span>
+            <span class="stat-value money" id="pay-stat-received">0,00 MAD</span>
+            <span class="stat-sub" id="pay-stat-received-sub"></span>
+          </div>
+          <div class="stat card">
+            <span class="stat-label" data-i18n="pay.statDue">Reste à encaisser</span>
+            <span class="stat-value money" id="pay-stat-due">0,00 MAD</span>
+            <span class="stat-sub" id="pay-stat-due-sub"></span>
+          </div>
+          <div class="stat card">
+            <span class="stat-label" data-i18n="pay.statLate">En retard</span>
+            <span class="stat-value money" id="pay-stat-late">0,00 MAD</span>
+            <span class="stat-sub" id="pay-stat-late-sub"></span>
+          </div>
+        </div>
+
+        <div class="card">
+          <p class="hint" data-i18n="pay.hint">Enregistrez les règlements de vos factures validées (total ou partiel) et suivez l’encours à encaisser.</p>
+          <div class="table-wrap">
+            <table id="pay-table"></table>
+          </div>
+        </div>
+      </section>
+
+      <!-- CLIENTS -->
+      <section id="view-clients" class="view">
+        <header class="view-header">
+          <h1 data-i18n="cl.title">Clients</h1>
+          <div class="actions">
+            <button class="btn primary" id="btn-new-client">
+              <svg class="ic"><use href="#i-plus"/></svg><span data-i18n="cl.new">Nouveau client</span>
+            </button>
+          </div>
+        </header>
+        <div class="card">
+          <div class="table-wrap">
+            <table id="client-table"></table>
+          </div>
+        </div>
+      </section>
+
+      <!-- RÈGLES -->
+      <section id="view-rules" class="view">
+        <header class="view-header">
+          <h1 data-i18n="ru.title">Règles automatiques</h1>
+          <div class="actions">
+            <button class="btn primary" id="btn-new-rule">
+              <svg class="ic"><use href="#i-plus"/></svg><span data-i18n="ru.new">Nouvelle règle</span>
+            </button>
+          </div>
+        </header>
+        <div class="card">
+          <p class="hint" data-i18n-html="ru.hint">Quand un libellé de transaction contient l'un des mots-clés, la facture générée est rattachée automatiquement au bon client, avec la bonne ligne et la bonne TVA.</p>
+          <div class="table-wrap">
+            <table id="rule-table"></table>
+          </div>
+        </div>
+      </section>
+
+      <!-- PARAMÈTRES -->
+      <section id="view-settings" class="view">
+        <header class="view-header">
+          <h1 data-i18n="set.title">Paramètres</h1>
+        </header>
+
+        <div class="card">
+          <div class="card-head"><h2 data-i18n="set.company">Mon entreprise</h2></div>
+          <div class="form-grid">
+            <label><span data-i18n="set.name">Nom / Raison sociale</span><input type="text" id="set-name" placeholder="Ma Société SARL"><span class="hint" id="set-name-hint" data-i18n="set.nameLocked" hidden></span></label>
+            <label><span data-i18n="set.nameAr">Nom de la société en arabe (facultatif)</span><input type="text" id="set-name-ar" dir="rtl" placeholder="اسم المؤسسة"></label>
+            <label><span data-i18n="set.ice">ICE — Identifiant Commun de l'Entrepreneur</span><input type="text" id="set-ice" inputmode="numeric" placeholder="002548793000054"></label>
+            <label><span data-i18n="set.if">IF — Identifiant Fiscal</span><input type="text" id="set-if" inputmode="numeric" placeholder="45879300"></label>
+            <label><span data-i18n="set.rc">RC — Registre de Commerce</span><input type="text" id="set-rc" placeholder="123456"></label>
+            <label><span data-i18n="set.patente">N° Patente</span><input type="text" id="set-patente" placeholder="45879300"></label>
+            <label><span data-i18n="set.cnss">N° CNSS</span><input type="text" id="set-cnss" inputmode="numeric" placeholder="123456789"></label>
+            <label><span data-i18n="set.tva">N° TVA</span><input type="text" id="set-tva" placeholder="002548793000054"></label>
+            <label><span data-i18n="set.address">Adresse</span><input type="text" id="set-address" placeholder="12 rue des Lilas"></label>
+            <label><span data-i18n="set.zip">Code postal</span><input type="text" id="set-zip" placeholder="20000"></label>
+            <label><span data-i18n="set.city">Ville</span><input type="text" id="set-city" placeholder="Casablanca"></label>
+            <label><span data-i18n="set.country">Pays</span><input type="text" id="set-country" placeholder="Maroc"></label>
+            <label><span data-i18n="set.email">E-mail</span><input type="email" id="set-email" placeholder="contact@masociete.ma"></label>
+            <label><span data-i18n="set.phone">Téléphone</span><input type="text" id="set-phone" placeholder="05 22 45 67 89"></label>
+            <label><span data-i18n="set.web">Site web</span><input type="text" id="set-web" placeholder="www.masociete.ma"></label>
+            <label class="wide"><span data-i18n="set.rib">RIB / CCP (mention sur la facture)</span><input type="text" id="set-iban" placeholder="0007 7880 0012 3456 7890 1234"></label>
+            <label class="wide">
+              <span data-i18n="set.logo">Logo de la société (affiché sur les factures)</span>
+              <span class="logo-pick">
+                <img id="set-logo-preview" alt="" hidden>
+                <span class="row">
+                  <button type="button" class="btn" id="btn-pick-logo" data-i18n="set.logoPick">Choisir un logo…</button>
+                  <button type="button" class="btn" id="btn-remove-logo" data-i18n="set.logoRemove" hidden>Retirer le logo</button>
+                </span>
+              </span>
+              <span class="hint" data-i18n="set.logoHint">PNG ou JPG — le logo apparaît en haut de chaque facture.</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2 data-i18n="set.billing">Facturation</h2></div>
+          <div class="form-grid">
+            <label><span data-i18n="set.tvaRate">TVA par défaut (%)</span><select id="set-tvarate"></select></label>
+            <label><span data-i18n="set.regime">Régime de TVA</span>
+              <select id="set-regime">
+                <option value="reel" data-i18n="set.regimeReel">Réel normal</option>
+                <option value="simplifie" data-i18n="set.regimeSimplifie">Simplifié</option>
+                <option value="liberatoire" data-i18n="set.regimeLiberatoire">Versement libératoire</option>
+                <option value="non-assujetti" data-i18n="set.regimeNonAssujetti">Non assujetti à la TVA</option>
+              </select>
+            </label>
+            <label><span data-i18n="set.delay">Délai de règlement (jours)</span><input type="number" id="set-delay" min="0" step="1"></label>
+            <label><span data-i18n="set.prefix">Préfixe de numérotation</span><input type="text" id="set-prefix" placeholder="FA"></label>
+            <label><span data-i18n="set.startNum">Début de numérotation (n° de la 1re facture)</span>
+              <input type="number" id="set-startnum" min="1" step="1" value="1"></label>
+            <label><span data-i18n="set.theme">Apparence</span>
+              <select id="set-theme">
+                <option value="light" data-i18n="set.themeLight">Clair</option>
+                <option value="dark" data-i18n="set.themeDark">Sombre</option>
+              </select>
+            </label>
+          </div>
+          <p class="hint" id="set-startnum-hint" data-i18n="set.startNumLocked" hidden></p>
+          <div class="row" style="margin-top:16px">
+            <button class="btn primary" id="btn-save-settings" data-i18n="set.save">Enregistrer les paramètres</button>
+            <span class="muted" id="settings-saved"></span>
+          </div>
+        </div>
+
+        <!-- DÉSIGNATIONS DES FACTURES -->
+        <div class="card" id="card-designations">
+          <div class="card-head"><h2 data-i18n="set.desigTitle">Désignations des factures</h2></div>
+          <p class="hint" data-i18n="set.desigHint">Définissez ici les désignations (libellés) proposés par défaut sur les lignes de facture. Choisissez ensuite, pour chaque client, celle à utiliser automatiquement — elle reste toujours modifiable sur la facture.</p>
+          <div class="row" style="margin-top:8px">
+            <input type="text" id="desig-new" data-i18n-ph="set.desigPh" placeholder="Prestation de services" style="flex:1;min-width:200px">
+            <button class="btn" id="btn-add-desig" data-i18n="set.desigAdd">Ajouter la désignation</button>
+          </div>
+          <ul id="desig-list" class="desig-list"></ul>
+          <div class="card-head" style="margin-top:14px"><h3 data-i18n="set.desigFor">Désignation par défaut, par client</h3></div>
+          <div class="form-grid" id="desig-clients"></div>
+        </div>
+
+        <!-- SAUVEGARDE / RESTAURATION -->
+        <div class="card">
+          <div class="card-head"><h2 data-i18n="set.backup">Sauvegarde & restauration</h2></div>
+          <div class="form-grid">
+            <label class="wide"><span data-i18n="set.dbPath">Emplacement de la base de données</span>
+              <input type="text" id="set-db-path" readonly value="">
+            </label>
+          </div>
+          <p class="hint" data-i18n="set.exportHint">Choisissez l’emplacement du fichier : paramètres, clients, factures, règlements, transactions et règles.</p>
+          <div class="row">
+            <button class="btn primary" id="btn-export-db">
+              <svg class="ic"><use href="#i-download"/></svg><span data-i18n="set.export">Sauvegarder la base…</span>
+            </button>
+            <button class="btn" id="btn-import-db">
+              <svg class="ic"><use href="#i-upload"/></svg><span data-i18n="set.import">Restaurer une sauvegarde…</span>
+            </button>
+            <button class="btn" id="btn-open-folder">
+              <svg class="ic"><use href="#i-folder"/></svg><span data-i18n="set.openFolder">Ouvrir le dossier</span>
+            </button>
+          </div>
+          <div class="row" style="margin-top:8px">
+            <button class="btn" id="btn-choose-db">
+              <svg class="ic"><use href="#i-db"/></svg><span data-i18n="set.chooseDb">Choisir l’emplacement de la base…</span>
+            </button>
+            <button class="btn" id="btn-reset-db">
+              <svg class="ic"><use href="#i-rotate"/></svg><span data-i18n="set.resetDb">Emplacement par défaut</span>
+            </button>
+          </div>
+          <div class="row auto-backup-row" style="margin-top:10px">
+            <span class="auto-backup-status">
+              <svg class="ic"><use href="#i-db"/></svg>
+              <span id="auto-backup-status" data-i18n="set.autoBackupIdle">Sauvegarde automatique quotidienne active.</span>
+            </span>
+            <button class="btn" id="btn-restore-auto" disabled>
+              <svg class="ic"><use href="#i-rotate"/></svg><span data-i18n="set.restoreAuto">Restaurer la dernière auto…</span>
+            </button>
+          </div>
+          <p class="hint" data-i18n="set.importHint">Sélectionnez un fichier .json : les données actuelles seront remplacées après confirmation.</p>
+        </div>
+
+        <!-- EXPORT COMPTABLE : CLÔTURE DE PÉRIODE -->
+        <div class="card">
+          <div class="card-head"><h2 data-i18n="set.closeTitle">Export comptable — clôture de période</h2></div>
+          <p class="hint" data-i18n="set.closeHint">Paquet .zip pour votre comptable : journal de ventes, TVA par taux, encaissements, balance âgée, rapprochement bancaire et factures PDF de la période — noms normalisés et empreinte SHA-256.</p>
+          <div class="form-grid">
+            <label><span data-i18n="set.closeFrom">Période du</span><input type="date" id="set-close-from"></label>
+            <label><span data-i18n="set.closeTo">Au</span><input type="date" id="set-close-to"></label>
+          </div>
+          <div class="row" style="margin-top:12px">
+            <button class="btn primary" id="btn-export-close-period">
+              <svg class="ic"><use href="#i-box"/></svg><span data-i18n="set.closeExport">Exporter le paquet comptable…</span>
+            </button>
+          </div>
+          <p class="hint" id="close-export-msg"></p>
+        </div>
+
+        <!-- SÉCURITÉ : mot de passe (monoposte) -->
+        <div class="card" id="card-security">
+          <div class="card-head"><h2 data-i18n="sec.title">Sécurité</h2></div>
+          <p class="hint" data-i18n="sec.hint">Protégez l'accès à l'application par un mot de passe. Version monoposte : l'application n'est utilisable que sur le poste où la protection a été activée.</p>
+          <p class="hint" id="sec-status"></p>
+          <p class="hint" id="lic-status"></p>
+          <div class="row" style="margin-top:8px">
+            <button class="btn primary" id="btn-sec-enable" hidden data-i18n="sec.enable">Activer la protection…</button>
+            <button class="btn" id="btn-sec-change" hidden data-i18n="sec.change">Changer le mot de passe…</button>
+            <button class="btn danger" id="btn-sec-disable" hidden data-i18n="sec.disable">Désactiver la protection…</button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ÉCRAN DE VERROUILLAGE / ACTIVATION / LICENCE / POSTE NON AUTORISÉ -->
+  <div id="lock-screen" hidden>
+    <div class="lock-box">
+      <img class="lock-logo" src="../../Logo.png" alt="MAZ-FATORA">
+      <h1>MAZ-FATORA</h1>
+      <div id="lock-mode"></div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="modal-root" hidden>
+    <div class="modal" id="modal-box"></div>
+  </div>
+
+  <div id="toast" hidden></div>
+
+  <script src="i18n.js"></script>
+  <script src="csv.js"></script>
+  <script src="words.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

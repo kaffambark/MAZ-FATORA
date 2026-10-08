@@ -1,0 +1,64 @@
+{
+  "name": "maz-fatora",
+  "productName": "MAZ-FATORA",
+  "version": "1.13.0",
+  "description": "MAZ-FATORA — facturation avec import de relevé bancaire et génération de factures à valider",
+  "main": "src/main/main.js",
+  "author": "MAZ-FATORA",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "test": "electron test/smoke.js",
+    "test:unit": "node --test test/unit/*.test.js",
+    "test:all": "npm run test:unit && npm test",
+    "license": "node tools/license.js",
+    "dist": "electron-builder --mac dmg --win nsis",
+    "dist:mac": "electron-builder --mac dmg",
+    "dist:win": "electron-builder --win nsis"
+  },
+  "build": {
+    "appId": "ma.mazfatora.desktop",
+    "productName": "MAZ-FATORA",
+    "copyright": "© 2026 MAZ-FATORA",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "package.json",
+      "Logo.png",
+      "Icon.png"
+    ],
+    "asarUnpack": [
+      "Icon.png",
+      "Logo.png",
+      "node_modules/pdfjs-dist/**"
+    ],
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "identity": null,
+      "category": "public.app-category.business"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "MAZ-FATORA"
+    }
+  },
+  "devDependencies": {
+    "electron": "^44.6.0",
+    "electron-builder": "^26.15.3"
+  },
+  "dependencies": {
+    "pdfjs-dist": "^6.4.299"
+  }
+}

@@ -1,0 +1,30 @@
+# Dépendances et artefacts de build
+node_modules/
+dist/
+build/
+
+# Sorties de construction
+*.dmg
+*.exe
+*.zip
+*.blockmap
+
+# Journaux d'application (local)
+*.log
+
+# Secrets et fichiers locaux
+config.local.json
+security.json
+
+# Clé privée de signature des licences (vendeur) — JAMAIS sur le dépôt.
+# La clé publique de vérification reste embarquée dans src/main/license-pub.json.
+tools/.license-keys.json
+
+# Artefacts des tests (le smoke écrit dans test/.tmp)
+test/.tmp/
+
+# macOS / éditeurs
+.DS_Store
+.idea/
+.vscode/
+*.swp

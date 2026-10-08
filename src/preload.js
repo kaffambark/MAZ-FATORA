@@ -1,0 +1,61 @@
+'use strict';
+
+const { contextBridge, ipcRenderer } = require('electron');
+
+contextBridge.exposeInMainWorld('factapi', {
+  // Application
+  appVersion: () => ipcRenderer.invoke('app:version'),
+
+  // Sécurité : mot de passe + postes autorisés
+  authStatus: () => ipcRenderer.invoke('auth:status'),
+  authSetup: (data) => ipcRenderer.invoke('auth:setup', data),
+  authUnlock: (password) => ipcRenderer.invoke('auth:unlock', password),
+  authLock: () => ipcRenderer.invoke('auth:lock'),
+  authReset: (data) => ipcRenderer.invoke('auth:reset', data),
+  authChange: (data) => ipcRenderer.invoke('auth:change', data),
+  authDisable: (password) => ipcRenderer.invoke('auth:disable', password),
+
+  // Licence d'utilisation (clé signée fournie par le vendeur)
+  licenseStatus: () => ipcRenderer.invoke('license:status'),
+  licenseRegister: (key) => ipcRenderer.invoke('license:register', key),
+
+  // Données
+  storeGet: () => ipcRenderer.invoke('store:get'),
+  storeSave: (collection, items) => ipcRenderer.invoke('store:save', collection, items),
+
+  // Import CSV / PDF
+  pickStatement: () => ipcRenderer.invoke('file:pick-statement'),
+  pickLogo: () => ipcRenderer.invoke('file:pick-logo'),
+
+  // Factures
+  exportPdf: (invoiceId) => ipcRenderer.invoke('invoice:export-pdf', invoiceId),
+  previewInvoice: (invoiceId) => ipcRenderer.invoke('invoice:preview', invoiceId),
+
+  // Sauvegarde / restauration de la base (choix de l'emplacement)
+  backupExport: () => ipcRenderer.invoke('backup:export'),
+  backupImport: () => ipcRenderer.invoke('backup:import'),
+  backupDataPath: () => ipcRenderer.invoke('backup:data-path'),
+  backupOpenFolder: () => ipcRenderer.invoke('backup:open-folder'),
+
+  // Sauvegarde automatique quotidienne (P0 fiabilisation)
+  autoBackupStatus: () => ipcRenderer.invoke('backup:auto-status'),
+  autoBackupRestore: () => ipcRenderer.invoke('backup:auto-restore'),
+
+  // Journal d'application (remontée du renderer vers le fichier log)
+  log: (...args) => ipcRenderer.invoke('log:write', ...args),
+
+  // Export comptable : paquet « clôture de période » (zip + empreinte)
+  exportClosePeriod: (period) => ipcRenderer.invoke('export:close-period', period),
+
+  // Emplacement de la base de données (choix du dossier + redémarrage)
+  dataPick: () => ipcRenderer.invoke('data:pick'),
+  dataApply: (target, opts) => ipcRenderer.invoke('data:apply', target, opts || {}),
+  dataReset: () => ipcRenderer.invoke('data:reset'),
+  dataRestart: () => ipcRenderer.invoke('data:restart'),
+
+  // Fenêtre d'impression de facture
+  invoiceReady: () => ipcRenderer.send('invoice:ready'),
+  invoiceWindowPrint: () => ipcRenderer.invoke('win:print'),
+  invoiceWindowPdf: (name) => ipcRenderer.invoke('win:save-pdf', name),
+  invoiceWindowClose: () => ipcRenderer.invoke('win:close')
+});
