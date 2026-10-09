@@ -9,6 +9,7 @@ const { extractEntries } = require('./pdf-statement');
 const { Security, detectDeviceId } = require('./security');
 const log = require('./app-log');
 const { createAutoBackup } = require('./autobackup');
+const { createUpdater } = require('./updater');
 const I18N = require('../renderer/i18n.js');
 
 const PRELOAD = path.join(__dirname, '..', 'preload.js');
@@ -89,6 +90,7 @@ let store = null;
 let mainWindow = null;
 let sec = null;
 let autoBk = null; /* sauvegarde automatique quotidienne (P0) */
+let updater = null; /* mise à jour automatique (electron-updater) */
 
 /* Verrouillage : tant que la protection est activée et la session verrouillée,
    les accès aux données / fichiers / fenêtres sont refusés (le renderer affiche
@@ -380,6 +382,16 @@ function registerIpc() {
   ipcMain.handle('backup:auto-status', gated(() => (autoBk ? autoBk.status() : { available: false, count: 0 })));
   ipcMain.handle('backup:auto-restore', gated(() => (autoBk ? autoBk.restore() : { error: 'none' })));
 
+  /* --- Mise à jour automatique (electron-updater, feed GitHub Releases) ---
+     Non verrouillé par gated : vérifier une mise à jour ne touche ni données
+     ni licence ; l'installation est déclenchée explicitement par l'utilisateur. */
+  ipcMain.handle('update:status', () => (updater ? updater.status() : { state: 'idle' }));
+  ipcMain.handle('update:check', () => (updater ? updater.check() : Promise.resolve({ state: 'error', message: 'none' })));
+  ipcMain.handle('update:install', () => {
+    if (updater) updater.install();
+    return true;
+  });
+
   /* --- Paquet « clôture de période » pour le comptable (export comptable) --- */
   const { buildPack, zipBuffer } = require('./export-pack');
 
@@ -588,6 +600,21 @@ app.whenReady().then(() => {
   } catch (e) { /* langue par défaut */ }
   registerIpc();
   createMainWindow();
+
+  /* Mise à jour automatique : chaque fenêtre (dont les aperçus de facture)
+     reçoit l'état. En développement, aucun réseau n'est consulté (état 'dev'). */
+  updater = createUpdater({
+    onStatus: (status) => {
+      for (const w of BrowserWindow.getAllWindows()) {
+        try { if (!w.isDestroyed()) w.webContents.send('update:status', status); } catch (e) { /* non bloquant */ }
+      }
+    },
+    log
+  });
+  /* Vérification automatique quelques secondes après le démarrage (packagé). */
+  if (app.isPackaged) {
+    setTimeout(() => { try { if (updater) updater.check(); } catch (e) { /* non bloquant */ } }, 5000);
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createMainWindow();

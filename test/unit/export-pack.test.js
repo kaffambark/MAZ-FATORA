@@ -48,7 +48,7 @@ function fixture() {
   };
 }
 
-const PERIOD = { from: '2026-09-01', to: '2026-09-30', appVersion: '1.13.0' };
+const PERIOD = { from: '2026-09-01', to: '2026-09-30', appVersion: '1.14.0' };
 
 test('paquet : 11 fichiers au périmètre, dont les 4 ODS', () => {
   const p = pack.buildPack(fixture(), PERIOD);

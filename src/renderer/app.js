@@ -845,6 +845,75 @@ function renderSettings() {
 
   /* ---- Sauvegarde automatique quotidienne (P0) ---- */
   renderAutoBackup();
+
+  /* ---- Mise à jour automatique (electron-updater) ---- */
+  renderUpdateStatus();
+}
+
+/* ---------------- Mise à jour automatique (electron-updater) ---------------- */
+
+let updateState = { state: 'idle', version: '', percent: 0, message: '', synced: false };
+
+function applyUpdateStatus(payload) {
+  if (!payload || typeof payload !== 'object') return;
+  updateState = Object.assign({ state: 'idle', version: '', percent: 0, message: '', synced: true }, payload);
+  renderUpdateStatus();
+}
+
+function updateStatusText() {
+  switch (updateState.state) {
+    case 'dev': return tr('upd.dev');
+    case 'checking': return tr('upd.checking');
+    case 'available': return tr('upd.available', { version: updateState.version });
+    case 'not-available': return tr('upd.notAvailable');
+    case 'downloading': return tr('upd.downloading', { percent: updateState.percent });
+    case 'downloaded': return tr('upd.downloaded');
+    case 'error': return tr('upd.error', { msg: updateState.message });
+    default: return tr('upd.idle');
+  }
+}
+
+async function renderUpdateStatus() {
+  const statusEl = $('#update-status');
+  if (!statusEl) return;
+  const btnCheck = $('#btn-check-update');
+  const btnInstall = $('#btn-install-update');
+  /* Premier affichage : état courant du process principal (une seule fois). */
+  if (!updateState.synced) {
+    try {
+      if (window.factapi && typeof window.factapi.updateStatus === 'function') {
+        const st = await window.factapi.updateStatus();
+        if (st && st.state) applyUpdateStatus(st);
+      }
+    } catch (e) {
+      updateState.message = String(e && e.message ? e.message : e);
+      updateState.state = 'error';
+    }
+    updateState.synced = true;
+  }
+  statusEl.textContent = updateStatusText();
+  const downloaded = updateState.state === 'downloaded';
+  if (btnCheck) btnCheck.hidden = downloaded;
+  if (btnInstall) btnInstall.hidden = !downloaded;
+}
+
+async function checkUpdates() {
+  applyUpdateStatus({ state: 'checking' });
+  try {
+    const fn = window.factapi && window.factapi.updateCheck;
+    const res = fn ? await fn() : null;
+    if (res && typeof res === 'object' && res.state) applyUpdateStatus(res);
+    else if (res === 'ok') applyUpdateStatus({ state: 'not-available' });
+  } catch (e) {
+    applyUpdateStatus({ state: 'error', message: String(e && e.message ? e.message : e) });
+  }
+}
+
+async function installUpdate() {
+  try {
+    if (!(await confirmBox(tr('upd.installConfirm', { version: updateState.version || '' })))) return;
+    if (window.factapi && window.factapi.updateInstall) await window.factapi.updateInstall();
+  } catch (e) { /* silencieux : l'utilisateur peut quitter puis réinstaller à la main */ }
 }
 
 async function renderAutoBackup() {
@@ -2484,6 +2553,12 @@ $('#btn-reset-db').addEventListener('click', resetDataDir);
 const btnRestoreAuto = $('#btn-restore-auto');
 if (btnRestoreAuto) btnRestoreAuto.addEventListener('click', restoreAutoBackup);
 
+/* ---- Mise à jour automatique (electron-updater) ---- */
+const btnCheckUpdate = $('#btn-check-update');
+if (btnCheckUpdate) btnCheckUpdate.addEventListener('click', checkUpdates);
+const btnInstallUpdate = $('#btn-install-update');
+if (btnInstallUpdate) btnInstallUpdate.addEventListener('click', installUpdate);
+
 /* ---- Désignations des factures (Paramètres) ---- */
 async function addDesignation() {
   const inp = $('#desig-new');
@@ -2680,6 +2755,11 @@ async function loadAppData() {
     state.invoices.forEach((i) => { if (!i.id) { i.id = uid(); repairedIds = true; } });
     if (typeof I18N !== 'undefined') I18N.setLang(state.settings.language);
     syncLangButtons();
+    /* Mise à jour : les états poussés par le process principal alimentent la
+       carte Paramètres → Mises à jour (aucune action tant que la CA est verrouillée). */
+    if (window.factapi && typeof window.factapi.onUpdateStatus === 'function') {
+      window.factapi.onUpdateStatus(applyUpdateStatus);
+    }
     renderAll();
     applyTheme();
     if (repairedIds) persist('invoices');

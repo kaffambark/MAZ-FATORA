@@ -482,6 +482,21 @@ const I18N_DICT = {
     'set.themeLight': 'Clair',
     'set.themeDark': 'Sombre',
 
+    /* --- mise à jour automatique (electron-updater) --- */
+    'upd.title': 'Mises à jour',
+    'upd.hint': 'MAZ-FATORA vérifie automatiquement les mises à jour (corrections et améliorations) au démarrage.',
+    'upd.check': 'Vérifier les mises à jour…',
+    'upd.install': 'Installer et redémarrer',
+    'upd.idle': 'Vérification automatique au démarrage.',
+    'upd.checking': 'Vérification des mises à jour…',
+    'upd.available': 'Version {version} disponible.',
+    'upd.notAvailable': 'Vous êtes à jour.',
+    'upd.downloading': 'Téléchargement… {percent} %',
+    'upd.downloaded': 'Mise à jour prête.',
+    'upd.error': 'Mise à jour impossible : {msg}',
+    'upd.dev': 'Mises à jour désactivées en développement.',
+    'upd.installConfirm': 'Redémarrer maintenant pour installer la version {version} ?',
+
     /* --- fenêtre d'aperçu de facture --- */
     'pi.notFound': 'Facture introuvable',
     'pi.locked': "Données verrouillées : ouvrez d'abord l'application.",
@@ -1024,6 +1039,21 @@ const I18N_DICT = {
     'set.theme': 'المظهر',
     'set.themeLight': 'فاتح',
     'set.themeDark': 'داكن',
+
+    /* --- تحديث تلقائي (electron-updater) --- */
+    'upd.title': 'التحديثات',
+    'upd.hint': 'يتحقق MAZ-FATORA تلقائياً من التحديثات (تصحيحات وتحسينات) عند بدء التشغيل.',
+    'upd.check': 'التحقق من التحديثات…',
+    'upd.install': 'تثبيت وإعادة التشغيل',
+    'upd.idle': 'تحقق تلقائي عند بدء التشغيل.',
+    'upd.checking': 'جارٍ التحقق من التحديثات…',
+    'upd.available': 'الإصدار {version} متوفر.',
+    'upd.notAvailable': 'أنت على أحدث إصدار.',
+    'upd.downloading': 'جارٍ التنزيل… {percent}٪',
+    'upd.downloaded': 'التحديث جاهز.',
+    'upd.error': 'تعذر التحديث : {msg}',
+    'upd.dev': 'التحديثات معطّلة في وضع التطوير.',
+    'upd.installConfirm': 'إعادة التشغيل الآن لتثبيت الإصدار {version} ؟',
 
     /* --- fenêtre d'aperçu de facture --- */
     'pi.notFound': 'الفاتورة غير موجودة',

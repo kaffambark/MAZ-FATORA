@@ -47,10 +47,31 @@ npm test
 
 ## Version
 
-La **version** s'affiche en bas de la barre latérale (ex. `v1.13`). À **chaque modification** du
+La **version** s'affiche en bas de la barre latérale (ex. `v1.14`). À **chaque modification** du
 projet, le champ `version` de `package.json` est incrémenté par la **partie mineure**
 (`1.0` → `1.1` → `1.2` …) et l'application affiche `major.minor`. Les noms d'installateurs
-reprennent la version complète (`1.13.0`).
+reprennent la version complète (`1.14.0`).
+
+## v1.14 — Mise à jour automatique (electron-updater)
+
+MAZ-FATORA vérifie **automatiquement les mises à jour au démarrage** et affiche l'état dans
+Paramètres → **Mises à jour** (bouton « Vérifier les mises à jour… », progression du
+téléchargement, puis « Installer et redémarrer » une fois la version prête). Le flux
+s'appuie sur **`electron-updater`** avec le dépôt **GitHub Releases** de ce projet comme
+canal de distribution :
+
+- `npm run dist` produit maintenant aussi les **métadonnées de mise à jour**
+  (`latest.yml` Windows, `latest-mac.yml` macOS, et le **zip** requis par Squirrel.Mac) ;
+- publier une *release* GitHub avec les installateurs de la nouvelle version suffit pour
+  que les clients existants soient informés et se mettent à jour ;
+- **Windows (NSIS)** : l'auto-install fonctionne, même **non signé** (avertissement
+  SmartScreen au premier lancement de la mise à jour) ;
+- **macOS (Squirrel.Mac)** : l'installation silencieuse exige une **signature Developer ID +
+  notarisation** (abonnement Apple) — le câblage et le ciblage `zip` sont déjà en place, il
+  suffira de signer pour activer l'auto-install ; sans certificat, la nouvelle version est
+  détectée et téléchargée, l'installation reste manuelle ;
+- **aucun réseau en développement** : hors application packagée, la vérification est
+  désactivée (état « dev » affiché dans Paramètres).
 
 ## v1.13 — P0 « fiabilisation de la fondation technique »
 
@@ -98,8 +119,8 @@ Chaque classeur :
 ## Packaging (`.dmg` macOS et `.exe` Windows)
 
 ```bash
-npm run dist        # macOS (.dmg) + Windows (.exe)
-npm run dist:mac    # uniquement le .dmg
+npm run dist        # macOS (.dmg + .zip) + Windows (.exe)
+npm run dist:mac    # uniquement le .dmg + .zip
 npm run dist:win    # uniquement l'installateur Windows
 ```
 
@@ -109,6 +130,20 @@ Les installateurs sont écrits dans **`dist/`** :
   (build **non signé** : premier lancement à faire via **clic droit → Ouvrir**) ;
 - **Windows** : `MAZ-FATORA Setup <version>.exe` — installateur NSIS (dossier au choix,
   raccourci bureau et menu Démarrer).
+
+### Publier une version (mise à jour automatique)
+
+Le build écrit aussi les **métadonnées d'auto-update** dans `dist/` (`latest.yml` /
+`latest-mac.yml` + `MAZ-FATORA-<version>-mac.zip`). Pour rendre la version disponible aux
+clients existants :
+
+```bash
+gh release create v1.14.0 dist/*.dmg dist/*-mac.zip dist/latest-mac.yml \
+  dist/*.exe dist/latest.yml --title "MAZ-FATORA 1.14.0" --notes "…"
+```
+
+L'application vérifie ce canal **au démarrage** (Paramètres → Mises à jour) : une version
+supérieure à la sienne est proposée puis installée au redémarrage.
 
 Chaque installeur est **autoportant** (« contient toutes les dépendances ») : Electron,
 l'application (`src/`), `pdfjs-dist` (extraction des relevés PDF, polices et cmaps inclus),
@@ -339,6 +374,8 @@ src/
     store.js            Stockage JSON local (atomique) + version de schéma et migrations
     app-log.js          Journal d'application <userData>/logs (rotation 7 jours) — P0
     autobackup.js       Sauvegarde automatique quotidienne (2 copies glissantes) — P0
+    updater.js          Mise à jour automatique (electron-updater, feed GitHub Releases ;
+                        no-op hors application packagée ou hors Electron)
     backup.js           Écriture / lecture / validation des sauvegardes
     security.js         Protection : mot de passe (scrypt), verrou, monoposte (empreinte
                         matérielle), licence signée
@@ -369,10 +406,11 @@ test/
                         refus d'une clé forgée, refus d'un poste au-delà du maximum,
                         nom du client figé dans Paramètres + logo de société inséré
                         sur les factures) puis Export comptable (paquet zip : journal, TVA,
-                        encaissements, balance âgée, rapprochement, empreinte SHA-256)
+                        encaissements, balance âgée, rapprochement, empreinte SHA-256) et
+                        Paramètres → Mises à jour (carte + IPC electron-updater)
   unit/                 npm run test:unit : tests unitaires sans Electron (node:test)
                         export-pack (CSV/ODS/empreinte/déterminisme), i18n (parité FR/AR),
-                        words (montants en lettres), store (migrations), autobackup
+                        words (montants en lettres), store (migrations), autobackup, updater
   debug-pdf.js          node test/debug-pdf.js <fichier.pdf> → trace d'extraction
 .github/workflows/
   ci.yml                CI : syntaxe + tests unitaires + smoke complet (xvfb)

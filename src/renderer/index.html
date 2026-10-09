@@ -552,6 +552,21 @@
           <p class="hint" id="close-export-msg"></p>
         </div>
 
+        <!-- MISE À JOUR AUTOMATIQUE (ELECTRON-UPDATER) -->
+        <div class="card">
+          <div class="card-head"><h2 data-i18n="upd.title">Mises à jour</h2></div>
+          <p class="hint" data-i18n="upd.hint">MAZ-FATORA vérifie automatiquement les mises à jour (corrections et améliorations) au démarrage.</p>
+          <div class="row" style="margin-top:10px">
+            <button class="btn" id="btn-check-update">
+              <svg class="ic"><use href="#i-arrow-up"/></svg><span data-i18n="upd.check">Vérifier les mises à jour…</span>
+            </button>
+            <button class="btn primary" id="btn-install-update" hidden>
+              <svg class="ic"><use href="#i-download"/></svg><span data-i18n="upd.install">Installer et redémarrer</span>
+            </button>
+            <span class="muted" id="update-status"></span>
+          </div>
+        </div>
+
         <!-- SÉCURITÉ : mot de passe (monoposte) -->
         <div class="card" id="card-security">
           <div class="card-head"><h2 data-i18n="sec.title">Sécurité</h2></div>

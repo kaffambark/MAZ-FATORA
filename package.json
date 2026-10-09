@@ -1,7 +1,7 @@
 {
   "name": "maz-fatora",
   "productName": "MAZ-FATORA",
-  "version": "1.13.0",
+  "version": "1.14.0",
   "description": "MAZ-FATORA — facturation avec import de relevé bancaire et génération de factures à valider",
   "main": "src/main/main.js",
   "author": "MAZ-FATORA",
@@ -37,7 +37,8 @@
     ],
     "mac": {
       "target": [
-        "dmg"
+        "dmg",
+        "zip"
       ],
       "identity": null,
       "category": "public.app-category.business"
@@ -47,6 +48,13 @@
         "nsis"
       ]
     },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "kaffambark",
+        "repo": "MAZ-FATORA"
+      }
+    ],
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
@@ -59,6 +67,7 @@
     "electron-builder": "^26.15.3"
   },
   "dependencies": {
+    "electron-updater": "^6.8.9",
     "pdfjs-dist": "^6.4.299"
   }
 }

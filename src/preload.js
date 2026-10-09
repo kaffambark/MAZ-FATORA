@@ -44,6 +44,15 @@ contextBridge.exposeInMainWorld('factapi', {
   // Journal d'application (remontée du renderer vers le fichier log)
   log: (...args) => ipcRenderer.invoke('log:write', ...args),
 
+  // Mise à jour automatique (electron-updater)
+  updateCheck: () => ipcRenderer.invoke('update:check'),
+  updateInstall: () => ipcRenderer.invoke('update:install'),
+  updateStatus: () => ipcRenderer.invoke('update:status'),
+  onUpdateStatus: (cb) => {
+    ipcRenderer.removeAllListeners('update:status');
+    ipcRenderer.on('update:status', (_event, payload) => cb(payload));
+  },
+
   // Export comptable : paquet « clôture de période » (zip + empreinte)
   exportClosePeriod: (period) => ipcRenderer.invoke('export:close-period', period),
 

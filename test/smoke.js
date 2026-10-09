@@ -176,6 +176,12 @@ ipcMain.handle('backup:auto-restore', () => ({
 /* P0 : journal d'application — acquis neutre dans les tests. */
 ipcMain.handle('log:write', () => true);
 
+/* Mise à jour automatique (electron-updater) : acquis neutre — aucun réseau.
+   L'état simulé annonce une vérification « à jour » dès le démarrage. */
+ipcMain.handle('update:status', () => ({ state: 'idle' }));
+ipcMain.handle('update:check', () => ({ state: 'not-available' }));
+ipcMain.handle('update:install', () => true);
+
 /* Logo de société : le sélecteur de fichier est remplacé par une image 1×1 (PNG),
    lue de la même façon que le vrai handler (data URI). */
 const LOGO_DATA_URI = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
@@ -194,7 +200,7 @@ ipcMain.handle('export:close-period', async (event, period) => {
   const pack = exportPack.buildPack(storeStub, {
     from: period && period.from,
     to: period && period.to,
-    appVersion: '1.13'
+    appVersion: '1.14'
   });
   const zipPath = path.join(__dirname, '.tmp', pack.base + '_cloture.zip');
   fs.writeFileSync(zipPath, exportPack.zipBuffer(pack.files));
@@ -202,7 +208,7 @@ ipcMain.handle('export:close-period', async (event, period) => {
 });
 
 /* Version de l'application (lue dans package.json par le vrai main.js) */
-ipcMain.handle('app:version', () => '1.13');
+ipcMain.handle('app:version', () => '1.14');
 
 function check(name, cond, detail) {
   if (cond) console.log('  ok   ' + name);
@@ -266,7 +272,7 @@ async function phaseUi() {
   check('logo posé sur fond blanc (lisibilité sur la sidebar bleue)',
     base.brandBg === 'rgb(255, 255, 255)', base.brandBg);
   check('favicon Icon.png déclaré', /Icon\.png/.test(base.favicon || ''), base.favicon);
-  check('version affichée dans la sidebar (v1.13)', base.version === 'v1.13', base.version);
+  check('version affichée dans la sidebar (v1.14)', base.version === 'v1.14', base.version);
   check('tableau de bord rempli', base.dashRendered);
   check('parseur CSV', !base.csvError && base.csv && base.csv.length === 3 &&
     base.csv[0].amount === 1200.5 && base.csv[1].amount === -25.5 && base.csv[2].amount === 34.99, base.csv || base.csvError);
@@ -1349,12 +1355,31 @@ async function phaseRegressions(uiWin) {
   check('2c : sauvegarde auto affichée (statut du jour + bouton actif)',
     autoDb.btn && autoDb.btnEnabled && /2026-10-08/.test(autoDb.status), autoDb);
 
+  /* --- d3) mise à jour automatique (electron-updater) --- */
+  await wait(200);
+  const upd = await ev(win, `(function () {
+    showView('settings');
+    return {
+      checkBtn: !!document.querySelector('#btn-check-update'),
+      installBtn: !!document.querySelector('#btn-install-update'),
+      installHidden: (document.querySelector('#btn-install-update') || {}).hidden,
+      status: (document.querySelector('#update-status') || {}).textContent || ''
+    };
+  })()`);
+  check('2c : mise à jour automatique affichée (bouton Vérifier + statut initial)',
+    upd.checkBtn && upd.installBtn && upd.installHidden === true &&
+    /démarrage|بدء/.test(upd.status), upd);
+
   const mainSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'main', 'main.js'), 'utf8');
   const preSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'preload.js'), 'utf8');
   check('2c : IPC emplacement de la base déclarés (main + preload)',
     /data:pick/.test(mainSrc) && /data:apply/.test(mainSrc) && /data:reset/.test(mainSrc) &&
     /data:restart/.test(mainSrc) && /dataPick/.test(preSrc) && /dataApply/.test(preSrc) &&
     /dataReset/.test(preSrc) && /dataRestart/.test(preSrc));
+  check('2c : IPC mise à jour déclarés (main + preload)',
+    /update:status/.test(mainSrc) && /update:check/.test(mainSrc) && /update:install/.test(mainSrc) &&
+    /app\.isPackaged/.test(mainSrc) && /updateStatus/.test(preSrc) && /updateCheck/.test(preSrc) &&
+    /updateInstall/.test(preSrc) && /onUpdateStatus/.test(preSrc));
   check('2c : chemin choisi mémorisé puis relu au démarrage (config.json)',
     /config\.json/.test(mainSrc) && /resolveDataDir\(\)/.test(mainSrc));
 }
