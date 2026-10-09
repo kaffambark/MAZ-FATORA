@@ -77,10 +77,10 @@ function resolveDataDir() {
   return DEFAULT_DATA_DIR;
 }
 
-/* Copie les 6 fichiers de la base vers un autre dossier (écrasement demandé). */
+/* Copie les 7 fichiers de la base vers un autre dossier (écrasement demandé). */
 function copyDataFiles(from, to) {
   fs.mkdirSync(to, { recursive: true });
-  for (const c of ['settings', 'clients', 'invoices', 'transactions', 'rules', 'meta']) {
+  for (const c of ['settings', 'clients', 'invoices', 'transactions', 'rules', 'quotes', 'meta']) {
     const src = path.join(from, c + '.json');
     if (fs.existsSync(src)) fs.copyFileSync(src, path.join(to, c + '.json'));
   }
@@ -171,11 +171,19 @@ function createMainWindow() {
 }
 
 async function buildInvoiceWindow(id, visible) {
+  return buildDocWindow('print-invoice.html', id, visible);
+}
+
+/* Fenêtre d'aperçu / PDF partagée (facture OU devis) : le renderer charge
+   print-invoice.html ou print-quote.html et prévient via « invoice:ready »
+   (canal commun, résolu par readyWaiters clé par webContents.id). */
+async function buildDocWindow(htmlFile, id, visible) {
+  const isQuote = htmlFile === 'print-quote.html';
   const win = new BrowserWindow({
     show: visible,
     width: 940,
     height: 1300,
-    title: I18N.tr('main.winInvoice'),
+    title: isQuote ? I18N.tr('main.winQuote') : I18N.tr('main.winInvoice'),
     backgroundColor: '#ffffff',
     webPreferences: {
       preload: PRELOAD,
@@ -210,7 +218,7 @@ async function buildInvoiceWindow(id, visible) {
     win.once('closed', onClosed);
   });
 
-  await win.loadFile(path.join(RENDERER_DIR, 'print-invoice.html'), { query: { id } });
+  await win.loadFile(path.join(RENDERER_DIR, htmlFile), { query: { id } });
   armLogging(win);
   await ready;
   return win;
@@ -531,6 +539,42 @@ function registerIpc() {
     try {
       const win = await buildInvoiceWindow(invoiceId, true);
       win.setTitle(I18N.tr('main.winInvoice'));
+      win.focus();
+      return true;
+    } catch (e) {
+      const parent = ipcWindow(event);
+      dialog.showErrorBox(I18N.tr('main.previewFail'), String(e && e.message ? e.message : e));
+      return false;
+    }
+  }));
+
+  /* --- Devis : aperçu et sauvegarde en PDF (rendu print-quote.html) --- */
+  ipcMain.handle('quote:export-pdf', gated(async (event, quoteId) => {
+    const parent = ipcWindow(event);
+    const data = store.loadAll();
+    const quote = data.quotes.find((q) => q.id === quoteId);
+    let win = null;
+    try {
+      win = await buildDocWindow('print-quote.html', quoteId, false);
+      const pdf = await printToPdf(win);
+      const suggested = (quote && (quote.number || 'devis')) + '.pdf';
+      const save = await dialog.showSaveDialog(parent, {
+        title: I18N.tr('main.saveQuotePdf'),
+        defaultPath: suggested,
+        filters: [{ name: 'PDF', extensions: ['pdf'] }]
+      });
+      if (save.canceled || !save.filePath) return { canceled: true };
+      fs.writeFileSync(save.filePath, pdf);
+      return { canceled: false, path: save.filePath };
+    } finally {
+      if (win && !win.isDestroyed()) win.destroy();
+    }
+  }));
+
+  ipcMain.handle('quote:preview', gated(async (event, quoteId) => {
+    try {
+      const win = await buildDocWindow('print-quote.html', quoteId, true);
+      win.setTitle(I18N.tr('main.winQuote'));
       win.focus();
       return true;
     } catch (e) {

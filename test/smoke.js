@@ -41,10 +41,13 @@ const storeStub = {
     tvaRegime: 'reel',
     tvaRate: 20,
     paymentDelay: 30,
-    invoicePrefix: 'FA'
+    invoicePrefix: 'FA',
+    quotePrefix: 'DV',
+    quoteValidityDays: 30
   },
   clients: [{ id: 'c1', name: 'Dupont SARL', email: '', address: '', tvaNumber: '', phone: '' }],
   invoices: [],
+  quotes: [],
   transactions: [
     { id: 't1', date: '2026-10-01', label: 'VIREMENT DU CLIENT DUPONT', amount: 1200.5, status: 'new', linkedInvoiceId: null },
     { id: 't2', date: '2026-10-03', label: 'CB LECLERC MARKET', amount: -87.45, status: 'new', linkedInvoiceId: null },
@@ -52,7 +55,7 @@ const storeStub = {
     { id: 't4', date: '2026-11-02', label: 'VIREMENT HORS PERIODE', amount: 500, status: 'new', linkedInvoiceId: null }
   ],
   rules: [],
-  meta: { invoiceSeq: 0 }
+  meta: { invoiceSeq: 0, quoteSeq: 0 }
 };
 
 /* ---- Sécurité (stubs alignés sur main.js, via le vrai module security.js) ----
@@ -200,7 +203,7 @@ ipcMain.handle('export:close-period', async (event, period) => {
   const pack = exportPack.buildPack(storeStub, {
     from: period && period.from,
     to: period && period.to,
-    appVersion: '1.14'
+    appVersion: '1.15'
   });
   const zipPath = path.join(__dirname, '.tmp', pack.base + '_cloture.zip');
   fs.writeFileSync(zipPath, exportPack.zipBuffer(pack.files));
@@ -208,7 +211,7 @@ ipcMain.handle('export:close-period', async (event, period) => {
 });
 
 /* Version de l'application (lue dans package.json par le vrai main.js) */
-ipcMain.handle('app:version', () => '1.14');
+ipcMain.handle('app:version', () => '1.15');
 
 function check(name, cond, detail) {
   if (cond) console.log('  ok   ' + name);
@@ -266,13 +269,13 @@ async function phaseUi() {
   })()`);
 
   check('API preload présente', base.hasApi);
-  check('9 vues rendues (dont Paiements)', base.views === 9, base.views);
+  check('10 vues rendues (dont Paiements et Devis)', base.views === 10, base.views);
   check('nom de l\'application = MAZ-FATORA', base.title === 'MAZ-FATORA', base.title);
   check('logo de marque chargé (Logo.png)', base.logo && base.logo.ok, base.logo);
   check('logo posé sur fond blanc (lisibilité sur la sidebar bleue)',
     base.brandBg === 'rgb(255, 255, 255)', base.brandBg);
   check('favicon Icon.png déclaré', /Icon\.png/.test(base.favicon || ''), base.favicon);
-  check('version affichée dans la sidebar (v1.14)', base.version === 'v1.14', base.version);
+  check('version affichée dans la sidebar (v1.15)', base.version === 'v1.15', base.version);
   check('tableau de bord rempli', base.dashRendered);
   check('parseur CSV', !base.csvError && base.csv && base.csv.length === 3 &&
     base.csv[0].amount === 1200.5 && base.csv[1].amount === -25.5 && base.csv[2].amount === 34.99, base.csv || base.csvError);
@@ -625,8 +628,8 @@ async function phaseExtras(win) {
       dbPath: (document.querySelector('#set-db-path') || {}).value || ''
     };
   })()`);
-  check('9 vues et 9 entrées de menu (nouvelle vue Paiements)',
-    entry.views === 9 && entry.navs === 9, entry);
+  check('10 vues et 10 entrées de menu (nouvelle vue Paiements)',
+    entry.views === 10 && entry.navs === 10, entry);
   check('accès « Nouvelle facture » (tableau de bord + factures validées)',
     entry.dashBtn && entry.invBtn, entry);
   check('vue Paiements : recherche et filtre présents', entry.payFilters, entry);
@@ -830,8 +833,8 @@ async function phaseExtras(win) {
     fs.existsSync(backupFile) && written.bytes > 200, written);
 
   const onDisk = JSON.parse(fs.readFileSync(backupFile, 'utf8'));
-  check('sauvegarde complète (6 collections)',
-    ['settings', 'clients', 'invoices', 'transactions', 'rules', 'meta']
+  check('sauvegarde complète (7 collections : devis inclus)',
+    ['settings', 'clients', 'invoices', 'transactions', 'rules', 'quotes', 'meta']
       .every((c) => backup.COLLECTIONS.indexOf(c) >= 0 &&
         Object.prototype.hasOwnProperty.call(onDisk.data, c)),
     Object.keys(onDisk.data));
@@ -855,11 +858,11 @@ async function phaseExtras(win) {
 
   const applied = await ev(win, `(async function () {
     const s = await window.factapi.storeGet();
-    applyBackupData({ settings: s.settings, clients: s.clients, invoices: [], transactions: [], rules: [], meta: { invoiceSeq: 0 } });
-    await persist('settings', 'clients', 'invoices', 'transactions', 'rules', 'meta');
+    applyBackupData({ settings: s.settings, clients: s.clients, invoices: [], transactions: [], rules: [], quotes: [], meta: { invoiceSeq: 0, quoteSeq: 0 } });
+    await persist('settings', 'clients', 'invoices', 'transactions', 'rules', 'quotes', 'meta');
     const emptied = (await window.factapi.storeGet()).invoices.length;
     applyBackupData(s);
-    await persist('settings', 'clients', 'invoices', 'transactions', 'rules', 'meta');
+    await persist('settings', 'clients', 'invoices', 'transactions', 'rules', 'quotes', 'meta');
     const back = await window.factapi.storeGet();
     return { emptied: emptied, n: back.invoices.length, lang: document.documentElement.lang, dir: document.documentElement.dir };
   })()`);
@@ -903,8 +906,8 @@ async function phaseExtras(win) {
       payments: val[0] ? (val[0].payments || []).length : -1
     };
   })()`);
-  check('état final propre (9 vues, modale fermée, base affichée, 1 règlement)',
-    final.views === 9 && final.modalHidden && final.dbPath === DATA_DIR && final.payments === 1, final);
+  check('état final propre (10 vues, modale fermée, base affichée, 1 règlement)',
+    final.views === 10 && final.modalHidden && final.dbPath === DATA_DIR && final.payments === 1, final);
 }
 
 async function phasePdf(uiWin) {
@@ -1758,7 +1761,7 @@ async function phaseSecurite(uiWin) {
   })()`);
   check('3 : sans protection, l\'application s\'ouvre normalement (pas d\'écran de verrouillage)',
     s0.lockHidden === true && s0.lockBtnHidden === true && s0.hasSecCard === true &&
-    s0.enableHidden === false && s0.views === 9 && s0.dash.length > 0, s0);
+    s0.enableHidden === false && s0.views === 10 && s0.dash.length > 0, s0);
 
   /* --- b) activation : Paramètres → Sécurité → « Activer la protection » --- */
   await ev(win, `showView('settings'); true`);
@@ -2228,6 +2231,154 @@ async function phaseExportPack(uiWin) {
     { manifeste: infos.fullHash, recalcul: recomputed });
 }
 
+/* ---- PHASE 1e : devis (v1.15) — DV, aperçu bilingue, conversion en facture ---- */
+async function phaseQuotes(win) {
+  console.log('--- PHASE 1e : DEVIS → FACTURE (v1.15) ---');
+
+  /* Retour à l'application (l'aperçu devis est chargé ensuite) */
+  await win.loadFile(path.join(__dirname, '..', 'src', 'renderer', 'index.html'));
+  await wait(900);
+
+  /* a) création d'un devis : numéro DV attribué à la création */
+  const q0 = await ev(win, `(async function () {
+    document.querySelector('#btn-new-quote').click();
+    const set = (sel, v) => { const el = document.querySelector(sel); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    const sel = document.querySelector('#qe-client');
+    sel.value = state.clients[0].id;
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    set('#qe-lines input[data-f="desc"]', 'Prestation de conseil — novembre 2026');
+    set('#qe-lines input[data-f="qty"]', '3');
+    set('#qe-lines input[data-f="price"]', '1000');
+    document.querySelector('#qe-save').click();
+    await new Promise(function (r) { setTimeout(r, 350); });
+    const q = state.quotes[0];
+    const days = q ? Math.round((new Date(q.validUntil + 'T12:00:00') - new Date(q.issueDate + 'T12:00:00')) / 86400000) : 0;
+    return {
+      n: state.quotes.length,
+      number: q && q.number,
+      status: q && q.status,
+      client: q && q.clientName,
+      ttc: q && totals(q).ttc,
+      tva20: q && totals(q).tva,
+      validDays: days,
+      modalHidden: document.querySelector('#modal-root').hidden
+    };
+  })()`);
+  check('devis créé : numéro DV-AAAA-0001, brouillon, TVA 20 % détaillée (600,00 / 3 600,00)',
+    q0.n === 1 && /^DV-\d{4}-0001$/.test(q0.number) && q0.status === 'draft' &&
+    q0.client === 'Dupont SARL' && q0.ttc === 3600 && q0.tva20 === 600 &&
+    q0.validDays === 30 && q0.modalHidden, q0);
+
+  const persisted = await ev(win, `window.factapi.storeGet()`);
+  check('devis persisté (collection quotes + meta.quoteSeq)',
+    Array.isArray(persisted.quotes) && persisted.quotes.length === 1 &&
+    persisted.meta.quoteSeq === 1 &&
+    /^DV-\d{4}-0001$/.test(persisted.quotes[0].number),
+    { quotes: persisted.quotes.length, seq: persisted.meta.quoteSeq, n: persisted.quotes[0] && persisted.quotes[0].number });
+
+  /* b) changement de statut dans l'éditeur : brouillon → accepté */
+  const st = await ev(win, `(function () {
+    openQuoteEditor(state.quotes[0].id);
+    const sel = document.querySelector('#qe-status');
+    sel.value = 'accepted';
+    document.querySelector('#qe-save').click();
+    return { status: state.quotes[0].status };
+  })()`);
+  check('statut du devis passé à « Accepté » dans l\'éditeur', st.status === 'accepted', st);
+
+  /* c) aperçu d'impression : DEVIS bilingue, validité, TVA — AUCUN tampon PAYÉE */
+  const qid = await ev(win, `state.quotes[0].id`);
+  await win.loadFile(path.join(__dirname, '..', 'src', 'renderer', 'print-quote.html'), { query: { id: qid } });
+  await wait(800);
+  const pq = await ev(win, `(function () {
+    const body = document.body.textContent;
+    return {
+      h1: (document.querySelector('.title h1') || {}).textContent || '',
+      ar: (document.querySelector('.title-ar') || {}).textContent || '',
+      metaRows: document.querySelectorAll('table.meta tr').length,
+      badge: !!document.querySelector('.badge-paid'),
+      words: /Arrêté le présent devis/.test(body),
+      validity: /Validité/.test(body),
+      tva20: /TVA 20 %/.test(body),
+      ttc: /3[ \u202f\u00a0]?600,00 MAD/.test(body),
+      toolbar: Array.from(document.querySelectorAll('.toolbar button')).map(function (b) { return b.textContent; }).join(' | ')
+    };
+  })()`);
+  check('aperçu devis : DEVIS / عرض الثمن, n° + date + validité, sans PAYÉE',
+    pq.h1 === 'DEVIS' && pq.ar.indexOf('عرض الثمن') !== -1 && pq.metaRows === 3 &&
+    !pq.badge && pq.words && pq.validity && pq.tva20 && pq.ttc, pq);
+  check('aperçu devis : barre d\'outils en français', /Fermer/.test(pq.toolbar), pq.toolbar);
+
+  /* d) retour application + conversion en facture (sens unique) */
+  await win.loadFile(path.join(__dirname, '..', 'src', 'renderer', 'index.html'));
+  await wait(900);
+  await ev(win, `(function () {
+    const btn = document.querySelector('[data-action="convert-quote"]');
+    if (btn) btn.click();
+    return !!btn;
+  })()`);
+  await wait(350);
+  const convDlg = await ev(win, `(function () {
+    return { open: !document.querySelector('#modal-root').hidden, ok: !!document.querySelector('#cf-ok') };
+  })()`);
+  check('conversion : confirmation demandée avant création de la facture',
+    convDlg.open && convDlg.ok, convDlg);
+  await ev(win, `document.querySelector('#cf-ok').click(); true;`);
+  await wait(450);
+
+  const conv = await ev(win, `(function () {
+    const q = state.quotes[0];
+    const inv = state.invoices.filter(function (i) { return i.quoteRef && i.quoteRef.id === q.id; })[0];
+    return {
+      qStatus: q.status,
+      qConvertedId: !!q.convertedInvoiceId,
+      num: inv && inv.number,
+      invStatus: inv && inv.status,
+      ref: inv && inv.quoteRef && inv.quoteRef.number,
+      notes: inv && inv.notes,
+      due: inv && inv.dueDate,
+      view: (document.querySelector('.view.active') || {}).id
+    };
+  })()`);
+  check('conversion : facture FA validée, devis « Converti » + référence croisée',
+    conv.qStatus === 'converted' && conv.qConvertedId &&
+    /^FA-\d{4}-\d{4}$/.test(conv.num) && conv.invStatus === 'validated' &&
+    /^DV-\d{4}-0001$/.test(conv.ref) && /DV-\d{4}-0001/.test(conv.notes) &&
+    conv.due && conv.view === 'view-invoices', conv);
+
+  /* e) re-conversion bloquée : aucun doublon de facture */
+  const again = await ev(win, `(async function () {
+    const before = state.invoices.length;
+    const res = await convertQuoteToInvoice(state.quotes[0].id);
+    return { res: res, nBefore: before, n: state.invoices.length };
+  })()`);
+  check('re-conversion bloquée : aucun doublon de facture',
+    again.res === false && again.n === again.nBefore, again);
+
+  /* f) le devis converti reste exportable : mention « Converti en facture FA-… »,
+        toujours sans tampon PAYÉE */
+  await win.loadFile(path.join(__dirname, '..', 'src', 'renderer', 'print-quote.html'), { query: { id: qid } });
+  await wait(800);
+  const pc = await ev(win, `(function () {
+    return {
+      conv: /Converti en facture FA-\\d{4}-\\d{4}/.test(document.body.textContent),
+      badge: !!document.querySelector('.badge-paid'),
+      title: (document.querySelector('.title h1') || {}).textContent
+    };
+  })()`);
+  check('aperçu devis converti : mention de la facture, toujours sans PAYÉE',
+    pc.conv && !pc.badge && pc.title === 'DEVIS', pc);
+
+  /* g) persistance : statut converti + facture + séquences dans la base stub */
+  const persisted2 = await ev(win, `window.factapi.storeGet()`);
+  check('conversion persistée (quotes + invoices + meta)',
+    persisted2.quotes.length === 1 && persisted2.quotes[0].status === 'converted' &&
+    persisted2.invoices.filter(function (i) { return i.status === 'validated'; }).length >= 1 &&
+    persisted2.meta.invoiceSeq >= 1 && persisted2.meta.quoteSeq === 1,
+    { q: persisted2.quotes[0].status, seqQ: persisted2.meta.quoteSeq,
+      seqF: persisted2.meta.invoiceSeq, inv: persisted2.invoices.length });
+}
+
 (async function main() {
   try {
     await app.whenReady();
@@ -2243,6 +2394,7 @@ async function phaseExportPack(uiWin) {
     await phaseSecurite(uiWin);
     await phaseLicence(uiWin);
     await phaseExportPack(uiWin);
+    await phaseQuotes(uiWin);
   } catch (e) {
     problems.push('exception: ' + (e && e.stack ? e.stack : e));
   }

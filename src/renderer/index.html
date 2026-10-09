@@ -44,6 +44,7 @@
       <symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></symbol>
       <symbol id="i-rotate" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></symbol>
       <symbol id="i-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></symbol>
+      <symbol id="i-quotes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/><circle cx="17" cy="19" r="2.2"/></symbol>
     </defs>
   </svg>
 
@@ -65,6 +66,9 @@
         </button>
         <button class="nav-item" data-view="invoices">
           <svg class="ic"><use href="#i-invoices"/></svg><span class="nav-label" data-i18n="nav.invoices">Factures validées</span>
+        </button>
+        <button class="nav-item" data-view="quotes">
+          <svg class="ic"><use href="#i-quotes"/></svg><span class="nav-label" data-i18n="nav.quotes">Devis</span><span class="badge" id="nav-quotes-count">0</span>
         </button>
         <button class="nav-item" data-view="payments">
           <svg class="ic"><use href="#i-payments"/></svg><span class="nav-label" data-i18n="nav.payments">Paiements</span>
@@ -332,6 +336,34 @@
         </div>
       </section>
 
+      <!-- DEVIS -->
+      <section id="view-quotes" class="view">
+        <header class="view-header">
+          <h1><span data-i18n="quo.title">Devis</span> <span class="badge big" id="quotes-count">0</span></h1>
+          <div class="actions">
+            <input type="search" id="quote-search" data-i18n-ph="quo.search" placeholder="Rechercher un devis…">
+            <select id="quote-filter">
+              <option value="all" data-i18n="quo.filterAll">Tous les statuts</option>
+              <option value="draft" data-i18n="quo.statusDraft">Brouillon</option>
+              <option value="sent" data-i18n="quo.statusSent">Envoyé</option>
+              <option value="accepted" data-i18n="quo.statusAccepted">Accepté</option>
+              <option value="converted" data-i18n="quo.statusConverted">Converti</option>
+              <option value="rejected" data-i18n="quo.statusRejected">Refusé</option>
+              <option value="expired" data-i18n="quo.statusExpired">Expiré</option>
+            </select>
+            <button class="btn primary" id="btn-new-quote">
+              <svg class="ic"><use href="#i-plus"/></svg><span data-i18n="quo.new">Nouveau devis</span>
+            </button>
+          </div>
+        </header>
+        <div class="card">
+          <p class="hint" data-i18n-html="quo.hint">Les devis sont numérotés <strong>DV‑AAAA‑NNNN</strong> avec une validité et une TVA détaillées. « Transformer en facture » crée la facture validée correspondante et fige le devis (statut « Converti »).</p>
+          <div class="table-wrap">
+            <table id="quote-table"></table>
+          </div>
+        </div>
+      </section>
+
       <!-- PAIEMENTS -->
       <section id="view-payments" class="view">
         <header class="view-header">
@@ -467,6 +499,8 @@
             </label>
             <label><span data-i18n="set.delay">Délai de règlement (jours)</span><input type="number" id="set-delay" min="0" step="1"></label>
             <label><span data-i18n="set.prefix">Préfixe de numérotation</span><input type="text" id="set-prefix" placeholder="FA"></label>
+            <label><span data-i18n="set.quotePrefix">Préfixe des devis</span><input type="text" id="set-quote-prefix" placeholder="DV"></label>
+            <label><span data-i18n="set.quoteValidity">Validité des devis (jours)</span><input type="number" id="set-quote-validity" min="1" step="1"></label>
             <label><span data-i18n="set.startNum">Début de numérotation (n° de la 1re facture)</span>
               <input type="number" id="set-startnum" min="1" step="1" value="1"></label>
             <label><span data-i18n="set.theme">Apparence</span>

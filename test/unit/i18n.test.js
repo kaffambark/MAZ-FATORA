@@ -47,7 +47,8 @@ test('i18n : aucune valeur vide dans les deux langues', () => {
 test('i18n : les clés référencées dans les pages HTML existent en FR et AR', () => {
   const files = [
     path.join(__dirname, '..', '..', 'src', 'renderer', 'index.html'),
-    path.join(__dirname, '..', '..', 'src', 'renderer', 'print-invoice.html')
+    path.join(__dirname, '..', '..', 'src', 'renderer', 'print-invoice.html'),
+    path.join(__dirname, '..', '..', 'src', 'renderer', 'print-quote.html')
   ];
   const attrs = ['data-i18n', 'data-i18n-html', 'data-i18n-ph', 'data-i18n-title', 'data-i18n-aria'];
   const used = new Set();

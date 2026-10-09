@@ -31,6 +31,10 @@ contextBridge.exposeInMainWorld('factapi', {
   exportPdf: (invoiceId) => ipcRenderer.invoke('invoice:export-pdf', invoiceId),
   previewInvoice: (invoiceId) => ipcRenderer.invoke('invoice:preview', invoiceId),
 
+  // Devis
+  quoteExportPdf: (quoteId) => ipcRenderer.invoke('quote:export-pdf', quoteId),
+  quotePreview: (quoteId) => ipcRenderer.invoke('quote:preview', quoteId),
+
   // Sauvegarde / restauration de la base (choix de l'emplacement)
   backupExport: () => ipcRenderer.invoke('backup:export'),
   backupImport: () => ipcRenderer.invoke('backup:import'),

@@ -3,19 +3,30 @@
 const fs = require('fs');
 const path = require('path');
 
-const COLLECTIONS = ['settings', 'clients', 'invoices', 'transactions', 'rules', 'meta'];
+const COLLECTIONS = ['settings', 'clients', 'invoices', 'transactions', 'rules', 'quotes', 'meta'];
 
 /* Version du schéma de données (P0 fiabilisation).
    - 0 = bases antérieures à la v1.13 (aucun marqueur écrit).
-   - 1 = version courante : le marqueur est écrit dans <dir>/schema.json.
+   - 1 = v1.13/v1.14 : le marqueur est écrit dans <dir>/schema.json.
+   - 2 = v1.15 : nouvelle collection « devis » (quotes, numérotation DV distincte).
    Une base qui n'a pas de marqueur est considérée en version 0 puis migrée
    sans transformation tant qu'aucune évolution de structure n'est requise. */
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 /* Migrations : MIGRATIONS[v] = transformation pour passer de la version v à v+1.
-   Actuellement aucune évolution de structure n'est nécessaire ; le mécanisme
-   est en place pour les futures versions. */
-const MIGRATIONS = [];
+   v1 → v2 (devis) : matérialise la collection quotes (nouvelle) et complète
+   meta avec la séquence de numérotation des devis (quoteSeq). */
+const MIGRATIONS = {
+  1: (api) => {
+    try {
+      /* meta : relu avec les défauts fusionnés (quoteSeq devient 0 sur une base
+         v1) puis réécrit pour matérialiser le champ sur le disque. */
+      api.save('meta', api.read('meta'));
+      /* quotes : nouvelle collection, matérialisée (vide) pour les anciennes bases. */
+      api.save('quotes', api.read('quotes') || []);
+    } catch (e) { /* non bloquant : les défauts couvrent un échec de migration */ }
+  }
+};
 
 const SCHEMA_FILE = 'schema.json';
 
@@ -45,13 +56,16 @@ const DEFAULTS = {
     tvaRate: 20,
     paymentDelay: 30,
     invoicePrefix: 'FA',
+    quotePrefix: 'DV',
+    quoteValidityDays: 30,
     autoGenerateOnImport: true
   },
   clients: [],
   invoices: [],
   transactions: [],
   rules: [],
-  meta: { invoiceSeq: 0 }
+  quotes: [],
+  meta: { invoiceSeq: 0, quoteSeq: 0 }
 };
 
 function clone(v) {

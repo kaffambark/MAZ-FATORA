@@ -47,10 +47,30 @@ npm test
 
 ## Version
 
-La **version** s'affiche en bas de la barre latérale (ex. `v1.14`). À **chaque modification** du
+La **version** s'affiche en bas de la barre latérale (ex. `v1.15`). À **chaque modification** du
 projet, le champ `version` de `package.json` est incrémenté par la **partie mineure**
 (`1.0` → `1.1` → `1.2` …) et l'application affiche `major.minor`. Les noms d'installateurs
-reprennent la version complète (`1.14.0`).
+reprennent la version complète (`1.15.0`).
+
+## v1.15 — Devis transformables en factures
+
+Une nouvelle vue **« Devis »** (10ᵉ vue, entre Factures validées et Paiements) permet de
+formaliser une proposition commerciale avant facturation :
+
+- **Création / édition** via l'éditeur existant (client, dates, lignes avec TVA détaillée,
+  notes, montant en toutes lettres) ;
+- **Numérotation dédiée** `DV-AAAA-NNNN` (séquence indépendante des factures, préfixe et
+  durée de validité réglables dans Paramètres → Numérotation) ;
+- **Statuts manuels** : Brouillon, Envoyé, Accepté, Refusé (l'expiration est calculée et
+  affichée quand la date de validité est dépassée) ;
+- **Impression / PDF bilingue** (DEVIS / عرض الثمن) : validité mise en avant, TVA par taux,
+  montant en toutes lettres — **jamais** de tampon « PAYÉE » ;
+- **Transformer en facture** (sens unique) : crée une **facture validée** numérotée FA, datée
+  du jour, avec les références croisées (le devis devient « Converti », la facture porte la
+  mention « Devis N° … ») ; la conversion est bloquée si le devis est déjà converti ;
+- les devis sont **exclus de la clôture comptable** (paquet export), par conception ;
+- **schéma v2** : nouvelle collection `quotes` + séquence `meta.quoteSeq` (migration
+  automatique des bases existantes).
 
 ## v1.14 — Mise à jour automatique (electron-updater)
 

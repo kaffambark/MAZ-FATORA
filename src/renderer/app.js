@@ -8,6 +8,7 @@ const state = {
   invoices: [],
   transactions: [],
   rules: [],
+  quotes: [],
   meta: {}
 };
 
@@ -94,6 +95,21 @@ async function persist(...collections) {
 
 function paymentDelay() { return Number(state.settings.paymentDelay) || 0; }
 
+/* Durée de validité par défaut d'un devis (jours) — réglable dans les Paramètres. */
+function quoteValidityDays() {
+  const v = Number(state.settings.quoteValidityDays);
+  return (v && v > 0) ? v : 30;
+}
+
+/* Un devis est « expiré » dès que sa date de validité est passée, sauf si un
+   changement de statut le fige (converti, refusé) — l'expiration reste un état
+   dérivé affiché en liste, le statut stocké reste celui de l'utilisateur. */
+function quoteExpired(q) {
+  if (!q) return false;
+  if (q.status === 'converted' || q.status === 'rejected') return false;
+  return Boolean(q.validUntil) && q.validUntil < todayISO();
+}
+
 /* TVA — taux marocains en vigueur : 20 %, 14 %, 10 %, 7 % + exonération 0 % */
 const TVA_RATES_MA = [20, 14, 10, 7, 0];
 function tvaDefault() {
@@ -115,6 +131,7 @@ function tvaOptionsHTML(value) {
 }
 function clientById(id) { return state.clients.find((c) => c.id === id) || null; }
 function invoiceById(id) { return state.invoices.find((i) => i.id === id) || null; }
+function quoteById(id) { return state.quotes.find((q) => q.id === id) || null; }
 function txById(id) { return state.transactions.find((t) => t.id === id) || null; }
 
 function clientNameOf(inv) {
@@ -346,6 +363,16 @@ function assignNumber(inv) {
   if (inv.transactionId) inv.paid = true;
 }
 
+/* Numérotation des DEVIS : séquence distincte (DV-AAAA-NNNN) — meta.quoteSeq
+   est indépendant de meta.invoiceSeq ; attribuée à la création, jamais réattribuée. */
+function assignQuoteNumber(q) {
+  const year = String(q.issueDate || todayISO()).slice(0, 4);
+  let seq = Number(state.meta.quoteSeq || 0) + 1;
+  state.meta.quoteSeq = seq;
+  const prefix = String(state.settings.quotePrefix || 'DV').trim() || 'DV';
+  q.number = `${prefix}-${year}-${String(seq).padStart(4, '0')}`;
+}
+
 /* ---------------- Navigation ---------------- */
 
 function showView(name) {
@@ -369,6 +396,7 @@ function renderAll() {
   renderTransactions();
   renderDrafts();
   renderValidated();
+  renderQuotes();
   renderPayments();
   renderClients();
   renderRules();
@@ -641,6 +669,77 @@ function renderValidated() {
     <tbody>${rows || `<tr><td colspan="7" class="empty">${tr('inv.empty')}</td></tr>`}</tbody>`;
 }
 
+/* ---------------- Devis (vue) ---------------- */
+
+/* Libellés i18n des statuts éditables d'un devis (le smoke contrôle que chaque
+   clé référencée existe en FR et AR). */
+const QUOTE_STATUS_KEY = {
+  draft: 'quo.statusDraft',
+  sent: 'quo.statusSent',
+  accepted: 'quo.statusAccepted',
+  rejected: 'quo.statusRejected'
+};
+
+/* Pastille d'état d'un devis — la couleur reflète le statut réel (l'expiration
+   est un état dérivé : elle ne remplace jamais le statut enregistré). */
+function quoteStatusMeta(q) {
+  const expired = quoteExpired(q);
+  if (expired) return { label: tr('quo.statusExpired'), cls: 'amber' };
+  switch (q.status) {
+    case 'sent': return { label: tr('quo.statusSent'), cls: 'blue' };
+    case 'accepted': return { label: tr('quo.statusAccepted'), cls: 'green' };
+    case 'converted': return { label: tr('quo.statusConverted'), cls: 'blue' };
+    case 'rejected': return { label: tr('quo.statusRejected'), cls: 'red' };
+    default: return { label: tr('quo.statusDraft'), cls: '' };
+  }
+}
+
+function renderQuotes() {
+  const q = norm($('#quote-search').value);
+  const f = $('#quote-filter').value;
+  let list = state.quotes.slice();
+  if (f !== 'all') list = list.filter((it) => (f === 'expired' ? quoteExpired(it) : it.status === f));
+  if (q) list = list.filter((it) => norm((it.number || '') + ' ' + (it.clientName || '')).includes(q));
+  list.sort((a, b) => String(b.number || '').localeCompare(String(a.number || '')));
+
+  const total = state.quotes.length;
+  $('#quotes-count').textContent = total;
+  $('#quotes-count').classList.toggle('zero', total === 0);
+  $('#nav-quotes-count').textContent = total;
+  $('#nav-quotes-count').classList.toggle('zero', total === 0);
+
+  const rows = list.map((qo) => {
+    const meta = quoteStatusMeta(qo);
+    const st = qo.status;
+    const convertedInv = qo.convertedInvoiceId ? invoiceById(qo.convertedInvoiceId) : null;
+    const convertable = ['draft', 'sent', 'accepted'].includes(st) && !quoteExpired(qo);
+    return `
+    <tr>
+      <td><strong>${esc(qo.number || '—')}</strong>
+        ${convertedInv ? `<div class="muted small">${tr('quo.quoteRef', { n: convertedInv.number || '' })}</div>` : ''}
+      </td>
+      <td>${esc(qo.clientName || tr('common.noClient'))}</td>
+      <td>${dateFR(qo.issueDate)}</td>
+      <td>${dateFR(qo.validUntil)}${quoteExpired(qo) ? ` <span class="pill small amber">${tr('quo.statusExpired')}</span>` : ''}</td>
+      <td class="num"><strong>${money(totals(qo).ttc)}</strong></td>
+      <td><span class="pill ${meta.cls}">${esc(meta.label)}</span></td>
+      <td>
+        <div class="row-actions">
+          <button class="btn small" data-action="edit-quote" data-id="${qo.id}">${tr('common.open')}</button>
+          ${convertable ? `<button class="btn small success" data-action="convert-quote" data-id="${qo.id}">${tr('quo.convert')}</button>` : ''}
+          <button class="btn small" data-action="preview-quote" data-id="${qo.id}">${tr('common.preview')}</button>
+          <button class="btn small" data-action="pdf-quote" data-id="${qo.id}">PDF</button>
+          <button class="btn small danger" data-action="delete-quote" data-id="${qo.id}">${tr('common.delete')}</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  $('#quote-table').innerHTML = `
+    <thead><tr><th>${tr('quo.number')}</th><th>${tr('common.client')}</th><th>${tr('common.date')}</th><th>${tr('quo.validity')}</th><th class="num">${tr('common.total')}</th><th>${tr('common.status')}</th><th></th></tr></thead>
+    <tbody>${rows || `<tr><td colspan="7" class="empty">${tr('quo.empty')}</td></tr>`}</tbody>`;
+}
+
 /* ---------------- Suivi des paiements (vue) ---------------- */
 
 function renderPayments() {
@@ -798,6 +897,8 @@ function renderSettings() {
   $('#set-regime').value = state.settings.tvaRegime || 'reel';
   $('#set-delay').value = state.settings.paymentDelay !== undefined ? state.settings.paymentDelay : 30;
   $('#set-prefix').value = state.settings.invoicePrefix || 'FA';
+  $('#set-quote-prefix').value = state.settings.quotePrefix || 'DV';
+  $('#set-quote-validity').value = state.settings.quoteValidityDays !== undefined ? state.settings.quoteValidityDays : 30;
   /* Début de numérotation : modifiable UNIQUEMENT tant qu'aucune facture n'existe */
   const startNum = $('#set-startnum');
   if (startNum) {
@@ -1252,6 +1353,289 @@ async function deleteAllDrafts() {
   await persist('invoices', 'transactions');
   renderAll();
   toast(tr('drafts.deleteAllDone', { n: drafts.length }), 'success');
+}
+
+/* ---------------- Éditeur de devis ---------------- */
+
+function openQuoteEditor(id) {
+  const existing = id ? quoteById(id) : null;
+  if (id && !existing) { toast(tr('quo.notFound'), 'error'); return; }
+  const draft = existing
+    ? JSON.parse(JSON.stringify(existing))
+    : {
+        id: null,
+        status: 'draft',
+        number: null,
+        clientId: null,
+        clientName: '',
+        issueDate: todayISO(),
+        validUntil: addDays(todayISO(), quoteValidityDays()),
+        validityDays: quoteValidityDays(),
+        lines: [{ desc: '', qty: 1, price: 0, tva: tvaDefault() }],
+        notes: '',
+        convertedInvoiceId: null,
+        convertedAt: null,
+        createdAt: new Date().toISOString()
+      };
+
+  const clientOptions = state.clients.map((c) =>
+    `<option value="${c.id}" ${draft.clientId === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
+
+  const statusOptions = ['draft', 'sent', 'accepted', 'rejected'].map((s) =>
+    `<option value="${s}" ${draft.status === s ? 'selected' : ''}>${tr(QUOTE_STATUS_KEY[s])}</option>`).join('');
+
+  openModal(`
+    <h2>${draft.number ? esc(tr('quo.edNumber', { n: draft.number })) : tr('quo.edNew')}</h2>
+    <p class="modal-sub">${tr('quo.edSub')}</p>
+
+    <div class="form-grid">
+      <label>${tr('ed.client')}
+        <select id="qe-client">
+          <option value="">${tr('ed.pickClient')}</option>
+          ${clientOptions}
+        </select>
+      </label>
+      <label>${tr('ed.issueDate')} <input type="date" id="qe-issue" value="${esc(draft.issueDate)}"></label>
+      <label>${tr('quo.edValidity')} <input type="number" id="qe-validity" min="1" step="1" value="${esc(draft.validityDays)}"></label>
+      <label>${tr('quo.edStatus')}
+        <select id="qe-status">${statusOptions}</select>
+      </label>
+    </div>
+
+    <details class="modal-section" id="qe-client-details">
+      <summary style="cursor:pointer;font-weight:600;color:var(--primary)">${tr('ed.addClientToggle')}</summary>
+      <div class="form-grid" style="margin-top:10px">
+        <label>${tr('ed.formName')} <input type="text" id="qe-nc-name" placeholder="Dupont SAS"></label>
+        <label>${tr('ed.formEmail')} <input type="email" id="qe-nc-email"></label>
+        <label class="wide">${tr('ed.formAddress')} <input type="text" id="qe-nc-address"></label>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn small" id="qe-nc-add">${tr('ed.addClient')}</button>
+      </div>
+    </details>
+
+    <div class="modal-section">
+      <h3>${tr('quo.edLines')}</h3>
+      <table class="lines-table">
+        <thead>
+          <tr>
+            <th>${tr('ed.desc')}</th>
+            <th class="num">${tr('ed.qty')}</th>
+            <th class="num">${tr('ed.pu')}</th>
+            <th class="num">${tr('ed.tvaPct')}</th>
+            <th class="num">${tr('ed.totalHT')}</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="qe-lines"></tbody>
+      </table>
+      <div class="row" style="margin-top:8px">
+        <button class="btn small" id="qe-add-line">${tr('ed.addLine')}</button>
+      </div>
+      <div class="totals" id="qe-totals"></div>
+      <p class="hint" id="qe-words" style="margin-top:10px"></p>
+    </div>
+
+    <div class="modal-section">
+      <label>${tr('quo.edNotesLabel')}
+        <textarea id="qe-notes" rows="2" placeholder="${tr('quo.edNotesPh')}">${esc(draft.notes)}</textarea>
+      </label>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn" id="qe-cancel">${tr('common.cancel')}</button>
+      ${draft.id && ['draft', 'sent', 'accepted'].includes(draft.status) && !quoteExpired(draft)
+        ? `<button class="btn success" id="qe-convert">${tr('quo.convert')}</button>` : ''}
+      <button class="btn primary" id="qe-save">${tr('quo.edSave')}</button>
+    </div>
+  `);
+
+  function renderLines() {
+    const tbody = $('#qe-lines');
+    tbody.innerHTML = draft.lines.map((l, i) => `
+      <tr>
+        <td><input type="text" data-i="${i}" data-f="desc" value="${esc(l.desc)}" placeholder="${tr('ed.linePh')}"></td>
+        <td class="num"><input type="number" data-i="${i}" data-f="qty" step="0.01" min="0" value="${esc(l.qty)}" style="width:80px"></td>
+        <td class="num"><input type="number" data-i="${i}" data-f="price" step="0.01" value="${esc(l.price)}" style="width:110px"></td>
+        <td class="num"><select data-i="${i}" data-f="tva" style="width:78px">${tvaOptionsHTML(l.tva)}</select></td>
+        <td class="num" data-total="${i}">${money((Number(l.qty) || 0) * (Number(l.price) || 0))}</td>
+        <td><button class="btn small danger" data-del-line="${i}" title="${tr('ed.delLine')}">✕</button></td>
+      </tr>`).join('');
+    renderTotals();
+  }
+
+  function renderTotals() {
+    const t = totals(draft);
+    $('#qe-totals').innerHTML = `
+      <div class="t-row"><span>${tr('ed.totalHT')}</span><span>${money(t.ht)}</span></div>
+      <div class="t-row"><span>${tr('ed.tva')}</span><span>${money(t.tva)}</span></div>
+      <div class="t-row t-total"><span>${tr('ed.totalTTC')}</span><span>${money(t.ttc)}</span></div>`;
+    const w = $('#qe-words');
+    if (w && typeof WORDS !== 'undefined') {
+      w.innerHTML = `<strong>${tr('quo.wordsLabel')}</strong> ${esc(WORDS.fr(t.ttc))}` +
+        `<span class="ar" dir="rtl">${esc(WORDS.ar(t.ttc))}</span>`;
+    }
+    draft.lines.forEach((l, i) => {
+      const cell = $(`[data-total="${i}"]`);
+      if (cell) cell.textContent = money((Number(l.qty) || 0) * (Number(l.price) || 0));
+    });
+  }
+
+  renderLines();
+
+  function onLinesEdit(e) {
+    const el = e.target;
+    if (!el.dataset || !el.dataset.f) return;
+    const i = Number(el.dataset.i);
+    const f = el.dataset.f;
+    draft.lines[i][f] = (f === 'desc') ? el.value : (el.value === '' ? 0 : Number(el.value));
+    renderTotals();
+  }
+  $('#qe-lines').addEventListener('input', onLinesEdit);
+  $('#qe-lines').addEventListener('change', onLinesEdit);
+
+  $('#qe-lines').addEventListener('click', (e) => {
+    const del = e.target.closest('[data-del-line]');
+    if (!del) return;
+    if (draft.lines.length === 1) { toast(tr('ed.errOneLine'), 'error'); return; }
+    draft.lines.splice(Number(del.dataset.delLine), 1);
+    renderLines();
+  });
+
+  $('#qe-add-line').addEventListener('click', () => {
+    draft.lines.push({ desc: '', qty: 1, price: 0, tva: tvaDefault() });
+    renderLines();
+    const inputs = $$('#qe-lines input[data-f="desc"]');
+    if (inputs.length) inputs[inputs.length - 1].focus();
+  });
+
+  $('#qe-nc-add').addEventListener('click', async () => {
+    const name = $('#qe-nc-name').value.trim();
+    if (!name) { toast(tr('ed.errName'), 'error'); return; }
+    const c = { id: uid(), name, email: $('#qe-nc-email').value.trim(), address: $('#qe-nc-address').value.trim(), phone: '', tvaNumber: '' };
+    state.clients.push(c);
+    await persist('clients');
+    draft.clientId = c.id;
+    const sel = $('#qe-client');
+    sel.insertAdjacentHTML('beforeend', `<option value="${c.id}" selected>${esc(c.name)}</option>`);
+    $('#qe-client-details').open = false;
+    renderClients();
+    toast(tr('ed.clientAdded'), 'success');
+  });
+
+  $('#qe-cancel').addEventListener('click', closeModal);
+
+  async function save() {
+    draft.clientId = $('#qe-client').value || null;
+    draft.issueDate = $('#qe-issue').value || todayISO();
+    let days = Math.max(1, Math.floor(Number($('#qe-validity').value)) || quoteValidityDays());
+    draft.validityDays = days;
+    draft.validUntil = addDays(draft.issueDate, days);
+    draft.status = $('#qe-status').value || 'draft';
+    draft.notes = $('#qe-notes').value;
+    const c = clientById(draft.clientId);
+    draft.clientName = c ? c.name : '';
+
+    if (!draft.clientId) { toast(tr('ed.errPickClient'), 'error'); return; }
+    draft.lines = draft.lines.filter((l) => String(l.desc).trim() !== '' || Number(l.price) !== 0);
+    if (!draft.lines.length) { toast(tr('ed.errLine'), 'error'); return; }
+
+    const isNew = !draft.id;
+    if (isNew) {
+      draft.id = uid();
+      assignQuoteNumber(draft);
+      state.quotes.push(draft);
+    } else {
+      const idx = state.quotes.findIndex((q) => q.id === draft.id);
+      if (idx !== -1) state.quotes[idx] = draft;
+    }
+
+    await persist('quotes', 'meta');
+    renderAll();
+    closeModal();
+    toast(isNew ? tr('quo.edSaved', { n: draft.number }) : tr('quo.edUpdated', { n: draft.number }), 'success');
+  }
+
+  $('#qe-save').addEventListener('click', save);
+
+  const convertBtn = $('#qe-convert');
+  if (convertBtn) convertBtn.addEventListener('click', async () => {
+    /* sauvegarde des champs avant conversion, pour ne pas perdre la saisie
+       en cours d'édition */
+    draft.clientId = $('#qe-client').value || null;
+    const c = clientById(draft.clientId);
+    draft.clientName = c ? c.name : '';
+    draft.notes = $('#qe-notes').value;
+    const ok = await convertQuoteToInvoice(draft.id, draft);
+    if (ok) closeModal();
+  });
+}
+
+/* Conversion d'un devis en facture (à sens unique) :
+   - crée une facture VALIDÉE, numérotée FA, datée du jour, en copiant les
+     lignes et la TVA du devis (les données sont figées à ce moment) ;
+   - marque le devis « Converti » avec la référence croisée de la facture ;
+   - la facture porte la mention « Devis N° DV-… » (réf. conservée). */
+async function convertQuoteToInvoice(qid, editorDraft) {
+  const q = editorDraft || quoteById(qid);
+  if (!q) { toast(tr('quo.notFound'), 'error'); return false; }
+  if (q.status === 'converted') {
+    const existing = q.convertedInvoiceId ? invoiceById(q.convertedInvoiceId) : null;
+    toast(tr('quo.convertAlready', { n: existing && existing.number ? existing.number : '' }), 'error');
+    return false;
+  }
+  if (!q.clientId) { toast(tr('quo.convertNoClient'), 'error'); return false; }
+  const t = totals(q);
+  const ok = await confirmBox(tr('quo.convertConfirm', { number: q.number || '—', client: q.clientName || '', total: money(t.ttc) }), { okLabel: tr('quo.convert') });
+  if (!ok) return false;
+
+  const inv = {
+    id: uid(),
+    status: 'draft' /* assignNumber le passe à validated */,
+    number: null,
+    clientId: q.clientId,
+    clientName: q.clientName || '',
+    issueDate: todayISO(),
+    dueDate: addDays(todayISO(), paymentDelay()),
+    lines: JSON.parse(JSON.stringify(q.lines || [])),
+    notes: q.notes
+      ? `${q.notes}\n— ${tr('quo.quoteRef', { n: q.number || '' })}`
+      : tr('quo.quoteRef', { n: q.number || '' }),
+    transactionId: null,
+    paid: false,
+    quoteRef: { id: q.id, number: q.number || '' },
+    createdAt: new Date().toISOString(),
+    validatedAt: null
+  };
+  assignNumber(inv);
+  state.invoices.push(inv);
+
+  q.status = 'converted';
+  q.convertedInvoiceId = inv.id;
+  q.convertedAt = new Date().toISOString();
+  const idx = state.quotes.findIndex((x) => x.id === q.id);
+  if (idx !== -1) state.quotes[idx] = q;
+
+  await persist('invoices', 'quotes', 'meta');
+  renderAll();
+  showView('invoices');
+  toast(tr('quo.convertDone', { n: inv.number, q: q.number || '' }), 'success');
+  return true;
+}
+
+async function deleteQuote(id) {
+  const q = quoteById(id);
+  if (!q) return;
+  const label = q.number || tr('quo.edNew');
+  const warn = q.status === 'converted' && q.convertedInvoiceId
+    ? `\n\n${tr('quo.delConvertedWarn', { n: (invoiceById(q.convertedInvoiceId) || {}).number || '' })}`
+    : '';
+  if (!(await confirmBox(tr('quo.delConfirm', { label }) + warn, { okLabel: tr('common.delete'), okClass: 'danger' }))) return;
+  state.quotes = state.quotes.filter((x) => x.id !== id);
+  await persist('quotes');
+  renderAll();
+  closeModal();
+  toast(tr('quo.delDone'));
 }
 
 /* ---------------- Paiements : modale de règlement ---------------- */
@@ -1968,7 +2352,7 @@ function setLanguage(lang) {
 /* L'emplacement du fichier est CHOISI dans le dialogue natif (export comme import). */
 async function exportBackup() {
   try {
-    await persist('settings', 'clients', 'invoices', 'transactions', 'rules', 'meta');
+    await persist('settings', 'clients', 'invoices', 'transactions', 'rules', 'quotes', 'meta');
     const res = await window.factapi.backupExport();
     if (!res || res.canceled) return;
     if (res.error) { toast(tr('set.exportFail', { msg: res.msg || res.error }), 'error'); return; }
@@ -1988,7 +2372,8 @@ function applyBackupData(data) {
   state.invoices = (data && data.invoices) || [];
   state.transactions = (data && data.transactions) || [];
   state.rules = (data && data.rules) || [];
-  state.meta = (data && data.meta && data.meta.invoiceSeq !== undefined) ? data.meta : { invoiceSeq: 0 };
+  state.quotes = (data && data.quotes) || [];
+  state.meta = (data && (data.meta && (data.meta.invoiceSeq !== undefined || data.meta.quoteSeq !== undefined))) ? data.meta : { invoiceSeq: 0, quoteSeq: 0 };
   if (typeof I18N !== 'undefined') I18N.setLang(state.settings.language || 'fr');
   syncLangButtons();
   renderAll();
@@ -2006,7 +2391,7 @@ async function importBackup() {
     const ok = await confirmBox(tr('set.importConfirm', { file: res.name }), { okClass: 'danger', okLabel: tr('common.confirm') });
     if (!ok) return;
     applyBackupData(res.data);
-    await persist('settings', 'clients', 'invoices', 'transactions', 'rules', 'meta');
+    await persist('settings', 'clients', 'invoices', 'transactions', 'rules', 'quotes', 'meta');
     toast(tr('set.importDone', { i: state.invoices.length, c: state.clients.length }), 'success');
   } catch (e) {
     toast(tr('set.importFail', { msg: e.message }), 'error');
@@ -2032,7 +2417,7 @@ async function restoreAutoBackup() {
     const ok = await confirmBox(tr('set.restoreAutoConfirm'), { okClass: 'danger', okLabel: tr('common.confirm') });
     if (!ok) return;
     applyBackupData(res.data);
-    await persist('settings', 'clients', 'invoices', 'transactions', 'rules', 'meta');
+    await persist('settings', 'clients', 'invoices', 'transactions', 'rules', 'quotes', 'meta');
     toast(tr('set.restoreAutoDone', { i: state.invoices.length, c: state.clients.length }), 'success');
   } catch (e) {
     toast(tr('set.restoreAutoFail', { msg: e.message }), 'error');
@@ -2434,6 +2819,15 @@ document.addEventListener('click', async (e) => {
       if (res && !res.canceled) toast(tr('inv.pdfSaved', { path: res.path }), 'success');
       break;
     }
+    case 'edit-quote': openQuoteEditor(id); break;
+    case 'convert-quote': await convertQuoteToInvoice(id); break;
+    case 'preview-quote': await window.factapi.quotePreview(id); break;
+    case 'pdf-quote': {
+      const res = await window.factapi.quoteExportPdf(id);
+      if (res && !res.canceled) toast(tr('quo.pdfSaved', { path: res.path }), 'success');
+      break;
+    }
+    case 'delete-quote': await deleteQuote(id); break;
     case 'pay-invoice': openPaymentModal(id); break;
     case 'pay-delete': await deletePayment(id, el.dataset.pay); break;
     case 'draft-from-tx': {
@@ -2521,6 +2915,10 @@ $('#btn-new-invoice').addEventListener('click', () => openInvoiceEditor(null));
 $('#btn-delete-all-drafts').addEventListener('click', deleteAllDrafts);
 $('#btn-new-invoice-dash').addEventListener('click', () => openInvoiceEditor(null));
 $('#btn-new-invoice-inv').addEventListener('click', () => openInvoiceEditor(null));
+$('#btn-new-quote').addEventListener('click', () => { showView('quotes'); openQuoteEditor(null); });
+/* Filtres de la liste des devis */
+$('#quote-search').addEventListener('input', renderQuotes);
+$('#quote-filter').addEventListener('change', renderQuotes);
 $('#btn-new-client').addEventListener('click', () => openClientEditor(null));
 $('#btn-new-rule').addEventListener('click', () => openRuleEditor(null));
 
@@ -2614,6 +3012,9 @@ $('#btn-save-settings').addEventListener('click', async () => {
   state.settings.paymentDelay = Number($('#set-delay').value) || 0;
   state.settings.theme = ($('#set-theme') && $('#set-theme').value === 'dark') ? 'dark' : 'light';
   state.settings.invoicePrefix = $('#set-prefix').value.trim() || 'FA';
+  state.settings.quotePrefix = $('#set-quote-prefix').value.trim() || 'DV';
+  const qv = Math.floor(Number($('#set-quote-validity').value));
+  state.settings.quoteValidityDays = (qv && qv > 0) ? qv : 30;
   /* Début de numérotation : figé dès qu'une facture existe */
   const startNum = $('#set-startnum');
   if (startNum) {
@@ -2748,7 +3149,8 @@ async function loadAppData() {
     state.invoices = data.invoices || [];
     state.transactions = data.transactions || [];
     state.rules = data.rules || [];
-    state.meta = data.meta || { invoiceSeq: 0 };
+    state.quotes = data.quotes || [];
+    state.meta = data.meta || { invoiceSeq: 0, quoteSeq: 0 };
     /* Réparation : factures enregistrées sans identifiant (bug antérieur) —
        sans id, l'éditeur se rouvrait vide et « Régler » ne trouvait pas la facture. */
     let repairedIds = false;
