@@ -134,13 +134,19 @@ Les installateurs sont écrits dans **`dist/`** :
 ### Publier une version (mise à jour automatique)
 
 Le build écrit aussi les **métadonnées d'auto-update** dans `dist/` (`latest.yml` /
-`latest-mac.yml` + `MAZ-FATORA-<version>-mac.zip`). Pour rendre la version disponible aux
-clients existants :
+`latest-mac.yml` + `MAZ-FATORA-<version>-mac.zip` requis par Squirrel.Mac). Pour rendre
+la version disponible aux clients existants, la façon la plus fiable est de laisser
+**electron-builder publier lui-même** (il garde le zip macOS, calcule des hashs
+cohérents et nomme les assets comme les `.yml` les référencent) :
 
 ```bash
-gh release create v1.14.0 dist/*.dmg dist/*-mac.zip dist/latest-mac.yml \
-  dist/*.exe dist/latest.yml --title "MAZ-FATORA 1.14.0" --notes "…"
+GH_TOKEN=<token GitHub> npm run dist -- --publish always
 ```
+
+Cette commande construit `.dmg` + `-mac.zip` (macOS) et `.exe` (Windows), puis crée la
+**GitHub Release** `v<version>` (le tag doit exister au préalable) et y upload
+`latest.yml`, `latest-mac.yml`, les installeurs et leurs blockmaps. Variante manuelle
+équivalente : `gh release create v1.14.0 dist/*.dmg dist/*-mac.zip dist/latest-mac.yml dist/*.exe dist/latest.yml`.
 
 L'application vérifie ce canal **au démarrage** (Paramètres → Mises à jour) : une version
 supérieure à la sienne est proposée puis installée au redémarrage.
