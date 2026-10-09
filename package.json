@@ -12,8 +12,8 @@
     "test:unit": "node --test test/unit/*.test.js",
     "test:all": "npm run test:unit && npm test",
     "license": "node tools/license.js",
-    "dist": "electron-builder --mac dmg --win nsis",
-    "dist:mac": "electron-builder --mac dmg",
+    "dist": "electron-builder --mac dmg zip --win nsis",
+    "dist:mac": "electron-builder --mac dmg zip",
     "dist:win": "electron-builder --win nsis"
   },
   "build": {
