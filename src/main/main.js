@@ -1,6 +1,6 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { createStore } = require('./store');
@@ -10,6 +10,8 @@ const { Security, detectDeviceId } = require('./security');
 const log = require('./app-log');
 const { createAutoBackup } = require('./autobackup');
 const { createUpdater } = require('./updater');
+const { buildMenuTemplate } = require('./menu');
+const { createBusyTracker, decideQuit, formatDuration } = require('./lifecycle');
 const I18N = require('../renderer/i18n.js');
 
 const PRELOAD = path.join(__dirname, '..', 'preload.js');
@@ -23,6 +25,30 @@ process.on('uncaughtException', (err) => {
 process.on('unhandledRejection', (reason) => {
   log.error('unhandledRejection', reason && (reason.stack || reason.message) || String(reason));
 });
+
+/* --- Instance unique : une seule instance écrit dans la même base. Une
+   seconde instance ne fait que réafficher (et focaliser) la fenêtre existante. --- */
+const gotSingleInstance = app.requestSingleInstanceLock();
+if (!gotSingleInstance) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    } else if (app.isReady()) {
+      createMainWindow();
+    }
+  });
+}
+
+/* --- Fin de session « pro » : opérations sensibles en cours comptées,
+   sauvegarde + verrou + journal à la fermeture (détail plus bas). --- */
+const busy = createBusyTracker();      /* exports / sauvegardes en cours */
+const STARTED_AT = Date.now();         /* durée de session (journal) */
+let isQuitting = false;               /* fermeture confirmée et acceptée */
+let cleaned = false;                  /* nettoyage effectué une seule fois */
 
 /* Nom de l'application (ancien nom conservé pour migrer la base existante) */
 const APP_NAME = 'MAZ-FATORA';
@@ -148,6 +174,85 @@ function rearmAfterDataMove() {
     autoBk = createAutoBackup(store);
     autoBk.maybe();
   } catch (e) { /* non bloquant */ }
+}
+
+/* Opération « sensible » (export, clôture, sauvegarde…) : comptabilisée pour
+   demander une confirmation de fermeture. withBusy(fn) incrémente le compteur
+   avant l'appel et le décrémente après (promesse ou non). */
+function withBusy(fn) {
+  return (event, ...args) => {
+    busy.begin();
+    let result;
+    try { result = fn(event, ...args); }
+    catch (e) { busy.end(); throw e; }
+    if (result && typeof result.then === 'function') return result.finally(() => busy.end());
+    busy.end();
+    return result;
+  };
+}
+
+/* Menu applicatif natif bilingue (Axe B) : reconstruit à chaque changement
+   de langue. Les actions envoyées au renderer passent par « menu:action ». */
+function installMenu() {
+  try {
+    const template = buildMenuTemplate({
+      tr: (k, v) => I18N.tr(k, v),
+      isMac: process.platform === 'darwin',
+      appName: APP_NAME,
+      onAction: (name) => {
+        const win = mainWindow && !mainWindow.isDestroyed()
+          ? mainWindow
+          : (BrowserWindow.getAllWindows().find((w) => !w.isDestroyed()) || null);
+        if (win) win.webContents.send('menu:action', name);
+      },
+      onAbout: () => showAbout(mainWindow)
+    });
+    Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+  } catch (e) {
+    log.warn('installation du menu impossible :', e.message);
+  }
+}
+
+function showAbout(parent) {
+  const opts = {
+    type: 'info',
+    title: I18N.tr('menu.aboutTitle'),
+    message: `${APP_NAME} — v${APP_VERSION}`,
+    detail: I18N.tr('menu.aboutBody'),
+    buttons: [I18N.tr('common.close')],
+    defaultId: 0,
+    noLink: true
+  };
+  try {
+    if (parent && !parent.isDestroyed()) dialog.showMessageBoxSync(parent, opts);
+    else dialog.showMessageBoxSync(opts);
+  } catch (e) { /* non bloquant */ }
+}
+
+/* Nettoyage de fermeture, exécuté UNE seule fois (Axe A + D) : sauvegarde
+   automatique, verrou éventuel, fenêtres d'impression fermées, updater
+   stoppé, journal de fin de session (durée + version). */
+function cleanUpOnQuit() {
+  if (cleaned) return;
+  cleaned = true;
+  try { if (autoBk) autoBk.write(); } catch (e) { /* non bloquant */ }
+  try { if (updater && updater.stop) updater.stop(); } catch (e) { /* non bloquant */ }
+  try {
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (w === mainWindow) continue;
+      if (!w.isDestroyed()) w.destroy();
+    }
+  } catch (e) { /* non bloquant */ }
+  try { readyWaiters.clear(); } catch (e) { /* non bloquant */ }
+  log.info('app quit', 'durée', formatDuration(Date.now() - STARTED_AT), 'version', 'v' + APP_VERSION);
+}
+
+/* Option « Verrouiller à la fermeture » (Paramètres → Sécurité, Axe C). */
+function lockOnQuitEnabled() {
+  try {
+    const s = store && store.read('settings');
+    return !!(s && s.lockOnQuit);
+  } catch (e) { return false; }
 }
 
 function createMainWindow() {
@@ -338,7 +443,11 @@ function registerIpc() {
   ipcMain.handle('store:save', gated((event, collection, items) => {
     store.save(collection, items);
     // La langue choisie dans l'interface pilote les dialogues et fenêtres du process principal.
-    if (collection === 'settings' && items && items.language) I18N.setLang(items.language, { rtl: false });
+    if (collection === 'settings' && items && items.language) {
+      const before = I18N.getLang();
+      I18N.setLang(items.language, { rtl: false });
+      if (I18N.getLang() !== before) installMenu();
+    }
     // P0 : un passage de sauvegarde automatique par jour (une seule écriture).
     if (autoBk) { try { autoBk.maybe(); } catch (e) { /* non bloquant */ } }
     return true;
@@ -422,7 +531,7 @@ function registerIpc() {
   /* --- Paquet « clôture de période » pour le comptable (export comptable) --- */
   const { buildPack, zipBuffer } = require('./export-pack');
 
-  ipcMain.handle('export:close-period', gated(async (event, period) => {
+  ipcMain.handle('export:close-period', withBusy(gated(async (event, period) => {
     const parent = ipcWindow(event);
     const data = store.loadAll();
     const from = (period && period.from) || '';
@@ -465,7 +574,7 @@ function registerIpc() {
     } catch (e) {
       return { canceled: false, error: 'write', msg: String(e && e.message ? e.message : e) };
     }
-  }));
+  })));
 
   ipcMain.handle('file:pick-statement', gated(async (event) => {
     const parent = ipcWindow(event);
@@ -532,7 +641,7 @@ function registerIpc() {
     }
   }));
 
-  ipcMain.handle('invoice:export-pdf', gated(async (event, invoiceId) => {
+  ipcMain.handle('invoice:export-pdf', withBusy(gated(async (event, invoiceId) => {
     const parent = ipcWindow(event);
     const data = store.loadAll();
     const invoice = data.invoices.find((i) => i.id === invoiceId);
@@ -552,7 +661,7 @@ function registerIpc() {
     } finally {
       if (win && !win.isDestroyed()) win.destroy();
     }
-  }));
+  })));
 
   ipcMain.handle('invoice:preview', gated(async (event, invoiceId) => {
     try {
@@ -568,7 +677,7 @@ function registerIpc() {
   }));
 
   /* --- Devis : aperçu et sauvegarde en PDF (rendu print-quote.html) --- */
-  ipcMain.handle('quote:export-pdf', gated(async (event, quoteId) => {
+  ipcMain.handle('quote:export-pdf', withBusy(gated(async (event, quoteId) => {
     const parent = ipcWindow(event);
     const data = store.loadAll();
     const quote = data.quotes.find((q) => q.id === quoteId);
@@ -588,7 +697,7 @@ function registerIpc() {
     } finally {
       if (win && !win.isDestroyed()) win.destroy();
     }
-  }));
+  })));
 
   ipcMain.handle('quote:preview', gated(async (event, quoteId) => {
     try {
@@ -604,7 +713,7 @@ function registerIpc() {
   }));
 
   /* --- Guide d'utilisation : aperçu et sauvegarde en PDF (print-guide.html) --- */
-  ipcMain.handle('guide:export-pdf', gated(async (event, lang) => {
+  ipcMain.handle('guide:export-pdf', withBusy(gated(async (event, lang) => {
     const parent = ipcWindow(event);
     let win = null;
     try {
@@ -626,7 +735,7 @@ function registerIpc() {
     } finally {
       if (win && !win.isDestroyed()) win.destroy();
     }
-  }));
+  })));
 
   ipcMain.handle('guide:preview', gated(async (event, lang) => {
     try {
@@ -676,6 +785,9 @@ function registerIpc() {
 }
 
 app.whenReady().then(() => {
+  /* Seconde instance : l'application quitte immédiatement, rien à initialiser. */
+  if (!gotSingleInstance) return;
+
   /* Icône du Dock / de la barre des tâches */
   try {
     const icon = assetPath('Icon.png');
@@ -692,6 +804,7 @@ app.whenReady().then(() => {
   } catch (e) {
     log.warn('migration du schéma impossible :', e.message);
   }
+  log.info('app start', 'v' + APP_VERSION, process.platform + '/' + process.arch);
   autoBk = createAutoBackup(store);
   try { autoBk.maybe(); } catch (e) { /* non bloquant */ }
   // Langue mémorisée : pilote les dialogues et les fenêtres (le renderer la relit lui-même).
@@ -701,6 +814,9 @@ app.whenReady().then(() => {
   } catch (e) { /* langue par défaut */ }
   registerIpc();
   createMainWindow();
+  /* Menu applicatif natif bilingue (Axe B) : après la langue, rejoué à chaque
+     changement de langue depuis Paramètres → Langue. */
+  installMenu();
 
   /* Mise à jour automatique : chaque fenêtre (dont les aperçus de facture)
      reçoit l'état. En développement, aucun réseau n'est consulté (état 'dev'). */
@@ -722,12 +838,59 @@ app.whenReady().then(() => {
   });
 });
 
+/* Fenêtre principale fermée :
+   - macOS : l'application reste active (dock). Si « Verrouiller à la fermeture »
+     est coché et la protection active, la session est verrouillée : rouvrir
+     depuis le dock redemande le mot de passe (Axe C).
+   - Windows / Linux : l'application quitte. */
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
+  if (process.platform === 'darwin') {
+    if (sec && sec.isProtected() && lockOnQuitEnabled()) {
+      try { sec.lockSession(); } catch (e) { /* non bloquant */ }
+    }
+    return;
+  }
+  app.quit();
 });
 
-/* P0 : une sauvegarde automatique est écrite à la fermeture (toujours à jour,
-   même si aucun enregistrement n'a eu lieu aujourd'hui). */
-app.on('before-quit', () => {
-  if (autoBk) { try { autoBk.write(); } catch (e) { /* non bloquant */ } }
+/* Séquence de fermeture « pro » :
+   1. Sauvegarde automatique + nettoyage (fenêtres d'impression, updater, journal).
+   2. Si une opération sensible est en cours (export / clôture / sauvegarde) :
+      confirmation native avant de quitter — jamais d'écriture interrompue.
+   3. Option « Verrouiller à la fermeture » : la session est verrouillée au quit. */
+app.on('before-quit', (e) => {
+  const plan = decideQuit({
+    busy: busy.count(),
+    confirmed: isQuitting,
+    lockOnQuit: lockOnQuitEnabled(),
+    protectedApp: !!(sec && sec.isProtected())
+  });
+
+  if (plan.mustConfirm) {
+    e.preventDefault();
+    const opts = {
+      type: 'warning',
+      title: APP_NAME,
+      message: I18N.tr('menu.quitBusy'),
+      detail: I18N.tr('menu.quitBusyDetail'),
+      buttons: [I18N.tr('menu.quitAnyway'), I18N.tr('menu.quitCancel')],
+      defaultId: 1,
+      cancelId: 1,
+      noLink: true
+    };
+    const choice = (mainWindow && !mainWindow.isDestroyed())
+      ? dialog.showMessageBoxSync(mainWindow, opts)
+      : dialog.showMessageBoxSync(opts);
+    if (choice === 0) {
+      isQuitting = true;
+      cleanUpOnQuit();
+      app.quit();
+    }
+    return;
+  }
+
+  if (plan.lockSession) {
+    try { sec && sec.lockSession(); } catch (e2) { /* non bloquant */ }
+  }
+  cleanUpOnQuit();
 });

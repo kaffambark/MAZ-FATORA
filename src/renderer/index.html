@@ -801,6 +801,13 @@
             <button class="btn" id="btn-sec-change" hidden data-i18n="sec.change">Changer le mot de passe…</button>
             <button class="btn danger" id="btn-sec-disable" hidden data-i18n="sec.disable">Désactiver la protection…</button>
           </div>
+          <div class="row" id="sec-lock-row" hidden style="margin-top:10px">
+            <label class="check">
+              <input type="checkbox" id="set-lock-on-quit">
+              <span data-i18n="sec.lockOnQuit">Verrouiller à la fermeture</span>
+            </label>
+          </div>
+          <p class="hint" id="sec-lock-hint" hidden data-i18n="sec.lockOnQuitHint">À la fermeture de la fenêtre ou de l’application, le mot de passe sera redemandé.</p>
         </div>
       </section>
 

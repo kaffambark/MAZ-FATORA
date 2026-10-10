@@ -204,7 +204,7 @@ ipcMain.handle('export:close-period', async (event, period) => {
   const pack = exportPack.buildPack(storeStub, {
     from: period && period.from,
     to: period && period.to,
-    appVersion: '1.22'
+    appVersion: '1.23'
   });
   const zipPath = path.join(__dirname, '.tmp', pack.base + '_cloture.zip');
   fs.writeFileSync(zipPath, exportPack.zipBuffer(pack.files));
@@ -212,7 +212,7 @@ ipcMain.handle('export:close-period', async (event, period) => {
 });
 
 /* Version de l'application (lue dans package.json par le vrai main.js) */
-ipcMain.handle('app:version', () => '1.22');
+ipcMain.handle('app:version', () => '1.23');
 
 function check(name, cond, detail) {
   if (cond) console.log('  ok   ' + name);
@@ -276,7 +276,7 @@ async function phaseUi() {
   check('logo posé sur fond blanc (lisibilité sur la sidebar bleue)',
     base.brandBg === 'rgb(255, 255, 255)', base.brandBg);
   check('favicon Icon.png déclaré', /Icon\.png/.test(base.favicon || ''), base.favicon);
-  check('version affichée dans la sidebar (v1.22)', base.version === 'v1.22', base.version);
+  check('version affichée dans la sidebar (v1.23)', base.version === 'v1.23', base.version);
   check('tableau de bord rempli', base.dashRendered);
   check('parseur CSV', !base.csvError && base.csv && base.csv.length === 3 &&
     base.csv[0].amount === 1200.5 && base.csv[1].amount === -25.5 && base.csv[2].amount === 34.99, base.csv || base.csvError);
@@ -1972,6 +1972,42 @@ async function phaseSecurite(uiWin) {
     noDevices.noBox && noDevices.noAdd && noDevices.noCodeField && noDevices.noList &&
     noDevices.disableBtn, { stG, noDevices });
 
+  /* --- g-bis) « Verrouiller à la fermeture » (v1.23) : option + persistance --- */
+  const lockRow = await ev(win, `(function () {
+    const row = document.getElementById('sec-lock-row');
+    const hint = document.getElementById('sec-lock-hint');
+    const chk = document.getElementById('set-lock-on-quit');
+    return {
+      rowVisible: row ? !row.hidden : false,
+      hintVisible: hint ? !hint.hidden : false,
+      hasChk: !!chk,
+      checked0: chk ? chk.checked : null
+    };
+  })()`);
+  check('3 : option « Verrouiller à la fermeture » visible et décochée par défaut',
+    lockRow.rowVisible && lockRow.hintVisible && lockRow.hasChk && lockRow.checked0 === false, lockRow);
+
+  await ev(win, `(function () {
+    const chk = document.getElementById('set-lock-on-quit');
+    chk.checked = true;
+    chk.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  })()`);
+  await wait(300);
+  const lockPersist = await ev(win, `window.factapi.storeGet()`);
+  check('3 : cocher l\'option → persistée dans les Paramètres',
+    lockPersist && lockPersist.settings && lockPersist.settings.lockOnQuit === true,
+    (lockPersist || {}).settings);
+
+  /* Retour au défaut pour ne pas interférer avec le reste du run. */
+  await ev(win, `(function () {
+    const chk = document.getElementById('set-lock-on-quit');
+    chk.checked = false;
+    chk.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  })()`);
+  await wait(200);
+
   /* --- h) désactivation (mot de passe requis) ; retour à une app normale --- */
   await clickId('#btn-sec-disable');
   await wait(200);
@@ -2979,7 +3015,7 @@ async function phaseGuide(win) {
   })()`);
   check('guide : couverture, sommaire, articles et aide-mémoire rendus (FR)',
     fr.dir === 'ltr' && fr.title === 'Guide d’utilisation' && fr.toc && fr.memo && fr.articles >= 40, fr);
-  check('guide : version affichée sur la couverture', /v1\.22/.test(fr.coverText), fr.coverText.slice(0, 100));
+  check('guide : version affichée sur la couverture', /v1\.23/.test(fr.coverText), fr.coverText.slice(0, 100));
 
   const pdf = await win.webContents.printToPDF({ printBackground: true, pageSize: 'A4' });
   check('guide : export PDF non vide (%PDF)',

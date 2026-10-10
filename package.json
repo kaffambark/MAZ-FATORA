@@ -1,7 +1,7 @@
 {
   "name": "maz-fatora",
   "productName": "MAZ-FATORA",
-  "version": "1.22.0",
+  "version": "1.23.0",
   "description": "MAZ-FATORA — facturation avec import de relevé bancaire et génération de factures à valider",
   "main": "src/main/main.js",
   "author": "MAZ-FATORA",

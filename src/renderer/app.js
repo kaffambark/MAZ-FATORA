@@ -1194,6 +1194,13 @@ function renderSecuritySettings() {
   if (bEnable) bEnable.hidden = secState.configured;
   if (bChange) bChange.hidden = !secState.configured;
   if (bDisable) bDisable.hidden = !secState.configured;
+  /* « Verrouiller à la fermeture » : visible seulement quand la protection est active. */
+  const lockRow = $('#sec-lock-row');
+  const lockHint = $('#sec-lock-hint');
+  const lockChk = $('#set-lock-on-quit');
+  if (lockRow) lockRow.hidden = !secState.configured;
+  if (lockHint) lockHint.hidden = !secState.configured;
+  if (lockChk) lockChk.checked = !!(state.settings && state.settings.lockOnQuit);
 }
 
 /* ---------------- Modal ---------------- */
@@ -3160,6 +3167,14 @@ if (btnSecEnable) btnSecEnable.addEventListener('click', async () => {
   renderSecScreen();
 });
 
+/* « Verrouiller à la fermeture » : option enregistrée dans les Paramètres ;
+   le process principal la relit au quit / à la fermeture de la fenêtre. */
+const lockOnQuitChk = $('#set-lock-on-quit');
+if (lockOnQuitChk) lockOnQuitChk.addEventListener('change', async () => {
+  state.settings.lockOnQuit = lockOnQuitChk.checked;
+  await persist('settings');
+});
+
 $('#btn-export-db').addEventListener('click', exportBackup);
 $('#btn-import-db').addEventListener('click', importBackup);
 $('#btn-open-folder').addEventListener('click', openDataFolder);
@@ -3486,6 +3501,18 @@ if (guidePdfBtn) guidePdfBtn.addEventListener('click', async () => {
     toast(tr('set.exportFail', { msg: e.message }), 'error');
   }
 });
+
+/* ---- Menu applicatif natif : actions envoyées par le process principal ----
+   (Quitter ⌘Q et rôles sont gérés nativement ; ici : Aide F1, Verrouiller ⌘L,
+   Paramètres ⌘,, Guide…). */
+if (window.factapi && typeof window.factapi.onMenuAction === 'function') {
+  window.factapi.onMenuAction((action) => {
+    if (action === 'help') { if (window.HELPUI) window.HELPUI.openContextual(); }
+    else if (action === 'lock') { lockNow(); }
+    else if (action === 'settings') { showView('settings'); }
+    else if (action === 'guide') { const b = $('#btn-guide-open'); if (b) b.click(); }
+  });
+}
 
 /* ---- Sélecteur de mois du tableau de bord ---- */
 const dashMonthSel = $('#dash-month');

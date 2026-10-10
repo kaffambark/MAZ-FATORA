@@ -61,6 +61,12 @@ contextBridge.exposeInMainWorld('factapi', {
     ipcRenderer.on('update:status', (_event, payload) => cb(payload));
   },
 
+  // Menu applicatif natif (actions envoyées par le process principal)
+  onMenuAction: (cb) => {
+    ipcRenderer.removeAllListeners('menu:action');
+    ipcRenderer.on('menu:action', (_event, action) => cb(action));
+  },
+
   // Export comptable : paquet « clôture de période » (zip + empreinte)
   exportClosePeriod: (period) => ipcRenderer.invoke('export:close-period', period),
 

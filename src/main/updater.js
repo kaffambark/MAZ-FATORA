@@ -86,6 +86,13 @@ function createUpdater({ onStatus, log } = {}) {
         try { autoUpdater.quitAndInstall(false, true); } catch (e) { /* non bloquant */ }
       }
     },
+    /* Fin de session : plus aucun événement à recevoir (fermeture propre).
+       L'installation différée (autoInstallOnAppQuit) reste active. */
+    stop() {
+      if (autoUpdater) {
+        try { autoUpdater.removeAllListeners(); } catch (e) { /* non bloquant */ }
+      }
+    },
     status() { return last; }
   };
 }

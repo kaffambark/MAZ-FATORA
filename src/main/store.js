@@ -58,7 +58,8 @@ const DEFAULTS = {
     invoicePrefix: 'FA',
     quotePrefix: 'DV',
     quoteValidityDays: 30,
-    autoGenerateOnImport: true
+    autoGenerateOnImport: true,
+    lockOnQuit: false
   },
   clients: [],
   invoices: [],

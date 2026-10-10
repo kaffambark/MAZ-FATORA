@@ -47,10 +47,31 @@ npm test
 
 ## Version
 
-La **version** s'affiche en bas de la barre latérale (ex. `v1.22`). À **chaque modification** du
+La **version** s'affiche en bas de la barre latérale (ex. `v1.23`). À **chaque modification** du
 projet, le champ `version` de `package.json` est incrémenté par la **partie mineure**
 (`1.0` → `1.1` → `1.2` …) et l'application affiche `major.minor`. Les noms d'installateurs
-reprennent la version complète (`1.22.0`).
+reprennent la version complète (`1.23.0`).
+
+## v1.23 — Fermeture d'application « pro » (4 axes)
+
+Fermeture robuste, sans perte de données, avec menu natif bilingue :
+
+1. **Robustesse** — **instance unique** (`requestSingleInstanceLock`) : un second lancement
+   réaffiche et focalise la fenêtre existante au lieu d'ouvrir une 2ᵉ instance sur la même base ;
+   séquence de fermeture propre (fenêtres d'impression fermées, *updater* stoppé, sauvegarde auto
+   écrite). Si un **export/clôture/impression PDF** est **en cours**, la fermeture demande une
+   **confirmation** native : aucune écriture n'est interrompue.
+2. **Menu applicatif natif bilingue** (`src/main/menu.js`, testé) — *Quitter* (⌘Q), **Verrouiller
+   (⌘L)**, **Paramètres… (⌘,)**, **Centre d'aide (F1)**, *Guide d'utilisation…*, *À propos*,
+   plus Édition/Affichage natifs. Le menu se reconstruit au changement de langue.
+2. **Sécurité** — option *Paramètres → Sécurité* : **« Verrouiller à la fermeture »**. À la
+   fermeture de la fenêtre ou de l'application, le mot de passe est redemandé (surtout utile sur
+   macOS, où fermer la fenêtre laisse l'application active).
+3. **Observabilité** — lignes de journal `app start` / `app quit` (durée de session, versions)
+   dans `<userData>/logs/` pour le support.
+
+Logique de fermeture isolée dans `src/main/lifecycle.js` (helpers purs testés :
+`createBusyTracker`, `decideQuit`, `formatDuration`).
 
 ## v1.22 — Modifier un paiement (facture validée)
 
