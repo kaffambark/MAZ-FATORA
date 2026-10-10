@@ -79,3 +79,29 @@ test('aging : export CSV (séparateur « ; », BOM, montants à point)', () => {
   assert.ok(csv.includes('1200.00'), 'reste dû en écriture point');
   assert.ok(csv.includes('0-30 j'));
 });
+
+test('aging fournisseurs : reste à payer, tranches et tri (référence forcée)', () => {
+  const expenses = [
+    { id: 'e1', supplier: 'Fournisseur B', label: 'Achat 1', date: '2026-09-10', amountTTC: 1200, payments: [] },
+    { id: 'e2', supplier: 'Fournisseur A', label: 'Achat 2', date: '2026-06-01', amountTTC: 1000, payments: [{ amount: 400 }] },
+    { id: 'e3', supplier: 'Fournisseur A', label: 'Soldé', date: '2026-09-01', amountTTC: 500, payments: [{ amount: 500 }] }
+  ];
+  const built = AGING.expenseRows(expenses, { ref: REF });
+  assert.strictEqual(built.n, 2);
+  assert.strictEqual(built.totals.rest, 1800);
+  assert.strictEqual(built.buckets['0-30'], 1200);
+  assert.strictEqual(built.buckets['90+'], 600);
+  assert.strictEqual(built.rows[0].supplierName, 'Fournisseur A');
+  assert.strictEqual(built.rows[0].rest, 600);
+  assert.strictEqual(built.rows[1].supplierName, 'Fournisseur B');
+});
+
+test('aging fournisseurs : drapeau « paid » hérité et export CSV', () => {
+  assert.strictEqual(AGING.expensePaid({ amountTTC: 800, paid: true }), 800);
+  const built = AGING.expenseRows([{ id: 'e1', supplier: 'Ali', label: 'Papier', date: '2026-09-10', amountTTC: 600, payments: [] }], { ref: REF });
+  const labels = { supplier: 'Fournisseur', label: 'Libellé', date: 'Date', ttc: 'Total TTC', paid: 'Payé', rest: 'Reste', days: 'Ancienneté', bucket: 'Tranche' };
+  const csv = AGING.expenseCsv(built, labels);
+  assert.strictEqual(csv.charCodeAt(0), 0xFEFF);
+  assert.ok(csv.includes('Fournisseur;Libellé;Date'));
+  assert.ok(csv.includes('Ali;Papier;2026-09-10;600.00;0.00;600.00;30;0-30 j'), csv);
+});

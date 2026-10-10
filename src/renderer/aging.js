@@ -157,6 +157,80 @@
     return '\uFEFF' + lines.map(function (r) { return r.map(esc).join(';'); }).join('\r\n');
   }
 
+  /* ---------- Achats fournisseurs (balance âgée « dettes ») ----------
+     Même règle que pour les clients, appliquée aux achats/dépenses :
+     reste dû = montant TTC − règlements. L'ancienneté se mesure depuis la date
+     d'achat (une dépense n'a pas d'échéance propre). */
+
+  /* Somme des règlements d'un achat (repli sur l'ancien drapeau « paid »). */
+  function expensePaid(e) {
+    var recs = Array.isArray(e && e.payments) ? e.payments : [];
+    if (recs.length) {
+      var s = 0;
+      for (var i = 0; i < recs.length; i++) s += Number(recs[i].amount) || 0;
+      return round2(s);
+    }
+    return e && e.paid ? round2(Number(e.amountTTC) || 0) : 0;
+  }
+
+  function expenseRows(expenses, opts) {
+    opts = opts || {};
+    var ref = todayISO(opts.ref);
+    var out = [];
+    var list = expenses || [];
+    for (var i = 0; i < list.length; i++) {
+      var e = list[i];
+      if (!e) continue;
+      var ttc = round2(Number(e.amountTTC) || 0);
+      var paid = expensePaid(e);
+      var rest = round2(ttc - paid);
+      if (rest <= 0) continue;
+      var due = e.dueDate || e.date || '';
+      var days = ageDays(due, e.date, ref);
+      out.push({
+        id: e.id,
+        supplierId: e.supplierId || '',
+        supplierName: e.supplier || '',
+        label: e.label || '',
+        date: e.date || '',
+        totalTTC: ttc,
+        paid: paid,
+        rest: rest,
+        days: days,
+        bucket: bucketId(due, days, ref)
+      });
+    }
+    out.sort(function (a, b) {
+      var c = String(a.supplierName).localeCompare(String(b.supplierName));
+      if (c !== 0) return c;
+      return b.days - a.days;
+    });
+    var totals = { rest: 0, paid: 0, totalTTC: 0 };
+    var buckets = { 'notdue': 0, '0-30': 0, '31-60': 0, '61-90': 0, '90+': 0 };
+    for (var j = 0; j < out.length; j++) {
+      totals.rest = round2(totals.rest + out[j].rest);
+      totals.paid = round2(totals.paid + out[j].paid);
+      totals.totalTTC = round2(totals.totalTTC + out[j].totalTTC);
+      buckets[out[j].bucket] = round2((buckets[out[j].bucket] || 0) + out[j].rest);
+    }
+    return { ref: ref, rows: out, totals: totals, buckets: buckets, n: out.length };
+  }
+
+  /* CSV de la balance fournisseurs (mêmes conventions : « ; », BOM UTF-8). */
+  function expenseCsv(built, labels) {
+    var L = labels || {};
+    var esc = function (v) {
+      var s = String(v === null || v === undefined ? '' : v);
+      return /[";\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+    var num = function (n) { return (Number(n) || 0).toFixed(2); };
+    var lines = [[L.supplier, L.label, L.date, L.ttc, L.paid, L.rest, L.days, L.bucket]];
+    (built.rows || []).forEach(function (r) {
+      lines.push([r.supplierName, r.label || '', r.date || '', num(r.totalTTC), num(r.paid), num(r.rest), r.days, labelFr(r.bucket)]);
+    });
+    return '\uFEFF' + lines.map(function (r) { return r.map(esc).join(';'); }).join('\r\n');
+  }
+
   return {
     todayISO: todayISO,
     docTotals: docTotals,
@@ -168,6 +242,9 @@
     labelFr: labelFr,
     labelAr: labelAr,
     rows: rows,
-    csv: csv
+    csv: csv,
+    expensePaid: expensePaid,
+    expenseRows: expenseRows,
+    expenseCsv: expenseCsv
   };
 });

@@ -55,10 +55,25 @@ npm test
 
 ## Version
 
-La **version** s'affiche en bas de la barre latérale (ex. `v1.27`). À **chaque modification** du
+La **version** s'affiche en bas de la barre latérale (ex. `v1.28`). À **chaque modification** du
 projet, le champ `version` de `package.json` est incrémenté par la **partie mineure**
 (`1.0` → `1.1` → `1.2` …) et l'application affiche `major.minor`. Les noms d'installateurs
-reprennent la version complète (`1.26.0`).
+reprennent la version complète (`1.28.0`).
+
+## v1.28 — Balance âgée fournisseurs & paquet comptable
+
+Le **reste à payer aux fournisseurs** rejoint la balance âgée et l'export comptable :
+
+1. **Sélecteur Clients / Fournisseurs** dans l'écran « Balance âgée » : le même moteur
+   d'ancienneté (module partagé `aging.js`) classe le **reste à payer** de chaque achat par
+   ancienneté — depuis la **date d'achat**, les dépenses n'ayant pas d'échéance propre.
+2. **Indicateurs et tranches** identiques (Non échue, 0-30 j, 31-60 j, 61-90 j, +90 j) et
+   **export CSV** dédié (`balance-agee-fournisseurs-….csv`).
+3. **Paquet comptable enrichi** (clôture de période) : deux nouveaux états **bilingues** (CSV + ODS) —
+   le **journal des achats** (HT, TVA déductible, TTC, payé, reste, statut) et la **balance âgée
+   fournisseurs**. Le manifeste compte désormais les **achats** et les **règlements fournisseurs**.
+4. **Aide** mise à jour (parité FR/AR testée) : la balance âgée décrit les deux périmètres et le
+   paquet comptable.
 
 ## v1.27 — Fournisseurs & paiements fournisseurs
 

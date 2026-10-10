@@ -1,8 +1,9 @@
 'use strict';
 
 /* Paquet « clôture de période » pour le comptable :
-   journal de ventes, récap TVA par taux, encaissements, balance âgée,
-   rapprochement bancaire, factures PDF, manifeste JSON et empreinte SHA-256.
+   journal de ventes, récap TVA par taux, encaissements, balance âgée clients,
+   journal des achats, balance âgée fournisseurs, rapprochement bancaire,
+   factures PDF, manifeste JSON et empreinte SHA-256.
    Module PUR (aucune dépendance Electron) : utilisé par main.js et par le smoke.
 
    Format des CSV : séparateur « ; », décimales à point, BOM UTF-8 (Excel FR). */
@@ -199,6 +200,61 @@ function balanceRows(data, invoices) {
   return rows.concat(out);
 }
 
+/* Achats & dépenses (paiements fournisseurs) — feuille du paquet comptable.
+   Chaque ligne : HT / TVA déductible / TTC, montant payé et reste à payer. */
+const EXP_STATUS = { paid: 'Payé', partial: 'Partiel', unpaid: 'Impayé' };
+function supplierNameOf(data, e) {
+  const s = (data.suppliers || []).find((x) => x.id === e.supplierId);
+  return (s && s.name) || e.supplier || '';
+}
+function expenseHtTva(e) {
+  const ttc = round2(Number(e && e.amountTTC) || 0);
+  const rate = Number(e && e.tvaRate) || 0;
+  const ht = round2(ttc / (1 + rate / 100));
+  return { ttc, ht, tva: round2(ttc - ht) };
+}
+function expensePaidTotal(e) {
+  const recs = Array.isArray(e && e.payments) ? e.payments : [];
+  if (recs.length) return round2(recs.reduce((s, p) => s + (Number(p.amount) || 0), 0));
+  return e && e.paid ? round2(Number(e.amountTTC) || 0) : 0;
+}
+function expenseStatus(e) {
+  const paid = expensePaidTotal(e);
+  const rest = round2((Number(e.amountTTC) || 0) - paid);
+  if (rest <= 0.005) return 'paid';
+  return paid > 0 ? 'partial' : 'unpaid';
+}
+
+/* Journal des achats : achats/dépenses de la période. */
+function achatsRows(data, expenses) {
+  const rows = [['Date', 'Fournisseur', 'Libellé', 'Catégorie', 'Montant HT', 'TVA déductible', 'Total TTC', 'Payé', 'Reste à payer', 'Statut']];
+  const out = expenses.map((e) => {
+    const t = expenseHtTva(e);
+    const paid = expensePaidTotal(e);
+    return [
+      e.date || '', supplierNameOf(data, e), e.label || '', e.category || '',
+      NUM(t.ht), NUM(t.tva), NUM(t.ttc), NUM(paid), NUM(Math.max(0, t.ttc - paid)),
+      EXP_STATUS[expenseStatus(e)] || ''
+    ];
+  });
+  out.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  return rows.concat(out);
+}
+
+/* Balance âgée FOURNISSEURS — moteur d'ancienneté PARTAGÉ (AGING.expenseRows),
+   le même que la vue in-app : le reste à payer est classé par ancienneté depuis
+   la date d'achat. */
+function balanceSupRows(data, expenses) {
+  const rows = [['Fournisseur', 'Libellé', 'Date', 'Total TTC', 'Payé', 'Reste', 'Ancienneté (jours)', 'Tranche']];
+  const built = AGING.expenseRows(expenses, { ref: todayISO() });
+  const out = built.rows.map((r) => [
+    r.supplierName || supplierNameOf(data, { supplierId: r.supplierId, supplier: r.supplierName }),
+    r.label || '', r.date || '',
+    NUM(r.totalTTC), NUM(r.paid), NUM(r.rest), r.days, AGING.labelFr(r.bucket)
+  ]);
+  return rows.concat(out);
+}
+
 function rapprochementRows(data, transactions) {
   const rows = [['Date', 'Libellé', 'Montant', 'Sens', 'Statut', 'Facture liée']];
   const out = transactions.map((t) => [
@@ -240,6 +296,7 @@ function buildPack(data, opts) {
   const inPeriod = (d) => d && d >= from && d <= to;
   const invoices = (data.invoices || []).filter((i) => inPeriod(i.issueDate));
   const transactions = (data.transactions || []).filter((t) => inPeriod(t.date));
+  const expenses = (data.expenses || []).filter((e) => inPeriod(e.date));
 
   const base = sanitizeBase(co.name);
   const pk = periodKey(from);
@@ -250,12 +307,16 @@ function buildPack(data, opts) {
   const AR_TVA = ['نسبة الضريبة', 'الوعاء خارج الضريبة', 'الضريبة المحصلة'];
   const AR_ENCAISSEMENTS = ['التاريخ', 'رقم الفاتورة', 'العميل', 'المبلغ', 'وسيلة الأداء', 'المرجع', 'حالة الفاتورة'];
   const AR_BALANCE = ['العميل', 'رقم الفاتورة', 'تاريخ الفاتورة', 'الاستحقاق', 'المجموع شامل الضريبة', 'المقبوض', 'الإشعارات الدائنة', 'الباقي', 'القدم (أيام)', 'الشريحة'];
+  const AR_ACHATS = ['التاريخ', 'المورد', 'البيان', 'الفئة', 'المبلغ خارج الضريبة', 'الضريبة القابلة للخصم', 'المجموع شامل الضريبة', 'المدفوع', 'الباقي للدفع', 'الحالة'];
+  const AR_BALANCE_SUP = ['المورد', 'البيان', 'التاريخ', 'المجموع شامل الضريبة', 'المدفوع', 'الباقي', 'القدم (أيام)', 'الشريحة'];
 
   const reports = [
     { csv: 'journal.csv', ods: 'journal.ods', sheet: 'Journal de ventes', rows: journalRows(data, invoices), ar: AR_JOURNAL },
     { csv: 'tva.csv', ods: 'tva.ods', sheet: 'TVA', rows: tvaRows(data, invoices), ar: AR_TVA },
     { csv: 'encaissements.csv', ods: 'encaissements.ods', sheet: 'Encaissements', rows: encaissementsRows(data, invoices, from, to), ar: AR_ENCAISSEMENTS },
     { csv: 'balance-agee.csv', ods: 'balance-agee.ods', sheet: 'Balance âgée', rows: balanceRows(data, invoices.concat((data.invoices || []).filter((i) => !inPeriod(i.issueDate)))), ar: AR_BALANCE },
+    { csv: 'achats.csv', ods: 'achats.ods', sheet: 'Achats & dépenses', rows: achatsRows(data, expenses), ar: AR_ACHATS },
+    { csv: 'balance-agee-fournisseurs.csv', ods: 'balance-agee-fournisseurs.ods', sheet: 'Balance âgée fournisseurs', rows: balanceSupRows(data, data.expenses || []), ar: AR_BALANCE_SUP },
     { csv: 'rapprochement.csv', ods: null, sheet: null, rows: rapprochementRows(data, transactions), ar: null }
   ];
   for (const r of reports) {
@@ -272,6 +333,7 @@ function buildPack(data, opts) {
   }
 
   const nPayments = invoices.reduce((s, inv) => s + ((inv.payments || []).length), 0);
+  const nSupPayments = (data.expenses || []).reduce((s, e) => s + ((e.payments || []).length), 0);
   const hash = fullHash(files);
   const fileList = files.map((f) => ({
     name: f.name, size: Buffer.byteLength(f.buf), sha256: fileHash(Buffer.isBuffer(f.buf) ? f.buf : Buffer.from(f.buf))
@@ -289,7 +351,7 @@ function buildPack(data, opts) {
       rc: co.rc || '', tvaNumber: co.tvaNumber || '',
       city: co.city || '', regime
     },
-    counts: { invoices: invoices.length, payments: nPayments, transactions: transactions.length },
+    counts: { invoices: invoices.length, payments: nPayments, transactions: transactions.length, expenses: expenses.length, supplierPayments: nSupPayments },
     exportedAt: now.toISOString(),
     fullHash: hash,
     files: fileList

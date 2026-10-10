@@ -221,7 +221,7 @@ ipcMain.handle('export:close-period', async (event, period) => {
   const pack = exportPack.buildPack(storeStub, {
     from: period && period.from,
     to: period && period.to,
-    appVersion: '1.27'
+    appVersion: '1.28'
   });
   const zipPath = path.join(__dirname, '.tmp', pack.base + '_cloture.zip');
   fs.writeFileSync(zipPath, exportPack.zipBuffer(pack.files));
@@ -229,7 +229,7 @@ ipcMain.handle('export:close-period', async (event, period) => {
 });
 
 /* Version de l'application (lue dans package.json par le vrai main.js) */
-ipcMain.handle('app:version', () => '1.27');
+ipcMain.handle('app:version', () => '1.28');
 
 function check(name, cond, detail) {
   if (cond) console.log('  ok   ' + name);
@@ -293,7 +293,7 @@ async function phaseUi() {
   check('logo posé sur fond blanc (lisibilité sur la sidebar bleue)',
     base.brandBg === 'rgb(255, 255, 255)', base.brandBg);
   check('favicon Icon.png déclaré', /Icon\.png/.test(base.favicon || ''), base.favicon);
-  check('version affichée dans la sidebar (v1.27)', base.version === 'v1.27', base.version);
+  check('version affichée dans la sidebar (v1.28)', base.version === 'v1.28', base.version);
   check('tableau de bord rempli', base.dashRendered);
   check('parseur CSV', !base.csvError && base.csv && base.csv.length === 3 &&
     base.csv[0].amount === 1200.5 && base.csv[1].amount === -25.5 && base.csv[2].amount === 34.99, base.csv || base.csvError);
@@ -2257,6 +2257,14 @@ async function phaseExportPack(uiWin) {
   storeStub.transactions = [
     { id: 't9', date: '2026-09-05', label: 'VIREMENT CLIENT ATLAS', amount: 1000, status: 'new', linkedInvoiceId: null }
   ];
+  /* Achats : 1 achat de septembre (partiellement réglé) + 1 loyer hors période
+     (inclus dans la balance âgée fournisseurs, exclu du journal des achats). */
+  storeStub.suppliers = [{ id: 's1', name: 'Fournitures Maroc' }];
+  storeStub.expenses = [
+    { id: 'g1', supplierId: 's1', supplier: 'Fournitures Maroc', label: 'Achat papier', category: 'Fournitures', date: '2026-09-08', amountTTC: 1200, tvaRate: 20,
+      payments: [{ id: 'sp1', date: '2026-09-09', amount: 400, method: 'virement', reference: 'VIR-2' }] },
+    { id: 'g2', supplier: 'Bailleur', label: 'Loyer atelier', category: 'Loyer', date: '2026-08-31', amountTTC: 1000, tvaRate: 0, payments: [] }
+  ];
 
   await win.loadFile(path.join(__dirname, '..', 'src', 'renderer', 'index.html'));
   await wait(900);
@@ -2276,12 +2284,16 @@ async function phaseExportPack(uiWin) {
   })`);
   const zipPath = path.join(__dirname, '.tmp', 'Client-Smoke_cloture.zip');
   check('5 : paquet exporté (message chemin + nb de fichiers)',
-    /Paquet exporté \(11 fichiers\)/.test(ui.msg) && /_cloture\.zip/.test(ui.msg), ui.msg);
+    /Paquet exporté \(15 fichiers\)/.test(ui.msg) && /_cloture\.zip/.test(ui.msg), ui.msg);
   check('5 : zip écrit sur disque', fs.existsSync(zipPath) && fs.statSync(zipPath).size > 0, zipPath);
 
   const zb = fs.readFileSync(zipPath);
   const entries = exportPack.zipEntries(zb);
   const expected = [
+    'Client-Smoke_2026-09_achats.csv',
+    'Client-Smoke_2026-09_achats.ods',
+    'Client-Smoke_2026-09_balance-agee-fournisseurs.csv',
+    'Client-Smoke_2026-09_balance-agee-fournisseurs.ods',
     'Client-Smoke_2026-09_balance-agee.csv',
     'Client-Smoke_2026-09_balance-agee.ods',
     'Client-Smoke_2026-09_encaissements.csv',
@@ -2318,6 +2330,16 @@ async function phaseExportPack(uiWin) {
     /;FA-2026-0043;2026-09-20;2026-10-20;285\.00;0\.00;0\.00;285\.00;0;Non échue/.test(bal) &&
     /;FA-2026-0044;2026-08-15;2026-09-15;120\.00;0\.00;0\.00;120\.00;\d+;0-30 j/.test(bal), bal);
 
+  const achats = zipRead(zb, 'Client-Smoke_2026-09_achats.csv').toString('utf8');
+  check('5 : journal des achats — période uniquement, TVA déductible, payé / reste',
+    /Achat papier/.test(achats) && !/Loyer atelier/.test(achats) &&
+    /;1000\.00;200\.00;1200\.00;400\.00;800\.00;Partiel/.test(achats), achats);
+
+  const balSup = zipRead(zb, 'Client-Smoke_2026-09_balance-agee-fournisseurs.csv').toString('utf8');
+  check('5 : balance âgée fournisseurs — reste à payer par fournisseur (hors période inclus)',
+    /Fournitures Maroc;Achat papier;2026-09-08;1200\.00;400\.00;800\.00;\d+;/.test(balSup) &&
+    /Bailleur;Loyer atelier;2026-08-31;1000\.00;0\.00;1000\.00;\d+;/.test(balSup), balSup);
+
   const rap = zipRead(zb, 'Client-Smoke_2026-09_rapprochement.csv').toString('utf8');
   check('5 : rapprochement — ligne bancaire de la période, non rattachée',
     /2026-09-05;VIREMENT CLIENT ATLAS;1000\.00;Crédit;Non traitée;/.test(rap), rap);
@@ -2346,10 +2368,11 @@ async function phaseExportPack(uiWin) {
 
   const infos = JSON.parse(zipRead(zb, 'Client-Smoke_2026-09_infos.json').toString('utf8'));
   const seal = zipRead(zb, 'Client-Smoke_2026-09_empreinte.txt').toString('utf8');
-  check('5 : manifeste — période, société, compteurs (2 factures / 1 règlement / 1 opération)',
+  check('5 : manifeste — période, société, compteurs (2 factures / 1 règlement / 1 opération / 1 achat)',
     infos.period.from === '2026-09-01' && infos.period.to === '2026-09-30' &&
     infos.society.name === 'Client Smoke' && infos.society.regime === 'Réel normal' &&
-    infos.counts.invoices === 2 && infos.counts.payments === 1 && infos.counts.transactions === 1, infos);
+    infos.counts.invoices === 2 && infos.counts.payments === 1 && infos.counts.transactions === 1 &&
+    infos.counts.expenses === 1 && infos.counts.supplierPayments === 1, infos);
 
   /* Intégrité : l'empreinte d'ensemble se recalcule à l'identique depuis les
      fichiers du zip (hors empreinte elle-même) et figure dans le manifeste. */
@@ -2360,6 +2383,11 @@ async function phaseExportPack(uiWin) {
   check('5 : empreinte SHA-256 — manifeste = empreinte.txt = recalcul',
     infos.fullHash === recomputed && seal.indexOf(recomputed) !== -1,
     { manifeste: infos.fullHash, recalcul: recomputed });
+
+  /* Nettoyage : les achats/fournisseurs de ce jeu ne doivent pas fuiter dans
+     les phases suivantes (elles repartent d'une base vide). */
+  storeStub.expenses = [];
+  storeStub.suppliers = [];
 }
 
 /* ---- PHASE 1e : devis (v1.15) — DV, aperçu bilingue, conversion en facture ---- */
@@ -3040,7 +3068,7 @@ async function phaseGuide(win) {
   })()`);
   check('guide : couverture, sommaire, articles et aide-mémoire rendus (FR)',
     fr.dir === 'ltr' && fr.title === 'Guide d’utilisation' && fr.toc && fr.memo && fr.articles >= 40, fr);
-  check('guide : version affichée sur la couverture', /v1\.27/.test(fr.coverText), fr.coverText.slice(0, 100));
+  check('guide : version affichée sur la couverture', /v1\.28/.test(fr.coverText), fr.coverText.slice(0, 100));
 
   const pdf = await win.webContents.printToPDF({ printBackground: true, pageSize: 'A4' });
   check('guide : export PDF non vide (%PDF)',
@@ -3248,6 +3276,40 @@ async function phaseBalance(uiWin) {
     /Client;N° facture/.test(exp.text || '') && /FA-2026-0002/.test(exp.text || '') &&
     /480\.00/.test(exp.text || '') && /^balance-agee-\d{4}-\d{2}-\d{2}\.csv$/.test(exp.suggestedName || ''),
     { name: exp.suggestedName, sample: String(exp.text || '').slice(0, 160) });
+
+  /* ---- Périmètre FOURNISSEURS (v1.28) : même écran, sélecteur « Fournisseurs ». */
+  const sup = await ev(win, `(function () {
+    const iso = (d) => { const x = new Date(); x.setDate(x.getDate() + d); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
+    state.suppliers = [{ id: 's1', name: 'Fournitures Maroc' }];
+    state.expenses = [
+      { id: 'e1', supplierId: 's1', supplier: 'Fournitures Maroc', label: 'Achat papier', amountTTC: 1200, tvaRate: 20, date: iso(-40), payments: [{ id: 'p1', date: iso(-39), amount: 400 }] },
+      { id: 'e2', supplier: 'Bailleur', label: 'Loyer atelier', amountTTC: 1000, tvaRate: 0, date: iso(-5), payments: [] }
+    ];
+    renderAll();
+    showView('balance');
+    document.querySelector('#bal-scope .scope-btn[data-scope="suppliers"]').click();
+    return {
+      title: document.querySelector('#bal-title').textContent,
+      total: document.querySelector('#bal-stat-total').textContent,
+      over: document.querySelector('#bal-stat-overdue').textContent,
+      rows: document.querySelectorAll('#bal-table tbody tr').length,
+      body: (document.querySelector('#bal-table tbody') || {}).textContent || ''
+    };
+  })()`);
+  /* e1 : 1200 − 400 = 800 (échue) ; e2 : 1000 (date passée → échue).
+     Total 1 800,00 ; échu 1 800,00. */
+  check('balance âgée : périmètre Fournisseurs (titre, 2 lignes, reste à payer)',
+    /fournisseurs/i.test(sup.title) && sup.rows === 2 &&
+    /1\s?800,00/.test(sup.total) && /1\s?800,00/.test(sup.over) &&
+    /Fournitures Maroc/.test(sup.body) && /800,00/.test(sup.body), sup);
+
+  await ev(win, `document.querySelector('#btn-export-balance').click()`);
+  await wait(250);
+  const expSup = lastAgingExport || {};
+  check('balance âgée : export CSV fournisseurs (en-tête, reste, nom de fichier)',
+    /Fournisseur;Libellé;Date/.test(expSup.text || '') && /Fournitures Maroc/.test(expSup.text || '') &&
+    /800\.00/.test(expSup.text || '') && /^balance-agee-fournisseurs-\d{4}-\d{2}-\d{2}\.csv$/.test(expSup.suggestedName || ''),
+    { name: expSup.suggestedName, sample: String(expSup.text || '').slice(0, 160) });
 }
 
 /* ---- PHASE : achats & dépenses (v1.26) ----

@@ -440,8 +440,12 @@
       <!-- BALANCE ÂGÉE -->
       <section id="view-balance" class="view">
         <header class="view-header">
-          <h1 data-i18n="bal.title">Balance âgée des clients</h1>
+          <h1 id="bal-title" data-i18n="bal.title">Balance âgée des clients</h1>
           <div class="actions">
+            <div class="scope-switch" id="bal-scope" role="tablist">
+              <button type="button" class="scope-btn active" data-scope="clients" data-i18n="bal.scopeClients">Clients</button>
+              <button type="button" class="scope-btn" data-scope="suppliers" data-i18n="bal.scopeSuppliers">Fournisseurs</button>
+            </div>
             <input type="search" id="bal-search" data-i18n-ph="bal.search" placeholder="Rechercher un client ou un n° de facture…">
             <select id="bal-filter">
               <option value="all" data-i18n="bal.filterAll">Toutes les tranches</option>
@@ -482,7 +486,7 @@
         </div>
 
         <div class="card">
-          <p class="hint" data-i18n="bal.hint">Reste dû par facture validée, après encaissements et avoirs, classé par ancienneté.</p>
+          <p class="hint" id="bal-hint" data-i18n="bal.hint">Reste dû par facture validée, après encaissements et avoirs, classé par ancienneté.</p>
           <div class="table-wrap">
             <table id="bal-table"></table>
           </div>

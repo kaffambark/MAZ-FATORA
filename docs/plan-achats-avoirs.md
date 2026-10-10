@@ -1,6 +1,6 @@
 # Plan — Avoirs, balance âgée, achats & dépenses
 
-Statut : **en cours de réalisation** (v1.24 → v1.27).
+Statut : **réalisé** (v1.24 → v1.28).
 Principes : tout est **hors ligne**, **bilingue FR/AR à parité testée**, les données
 restent des collections JSON avec **migrations de schéma**, et le **rendu des
 documents reste un moteur unique** (`print-doc.js`).
@@ -14,10 +14,12 @@ documents reste un moteur unique** (`print-doc.js`).
 | **v1.24** | **Avoir / note de crédit** (collection `creditNotes`, numérotation `AV-AAAA-NNNN`, PDF, impact TVA/reste dû) | v3 |
 | **v1.25** | **Balance âgée clients** in-app (module d'ancienneté partagé, vue + export/impression) | — |
 | **v1.26** | **Achats & dépenses** (collection `expenses`, catégories, fournisseurs, TVA déductible, **import des débits du relevé**) | v4 |
+| **v1.27** | **Fournisseurs & paiements fournisseurs** (collection `suppliers`, règlements par achat, reste à payer) | v5 |
+| **v1.28** | **Balance âgée fournisseurs** (sélecteur Clients/Fournisseurs) + **paquet comptable** (journal des achats, balance âgée fournisseurs, CSV/ODS bilingues) | — |
 
 Hors périmètre immédiat (plus tard) : factures fournisseurs avec lignes &
-échéances + balance âgée fournisseurs, rapprochement des débits, déclaration TVA
-`collectée − déductible`, e-facture DGI.
+échéances, rapprochement des débits, déclaration TVA `collectée − déductible`,
+e-facture DGI.
 
 ---
 
@@ -126,7 +128,8 @@ Hors périmètre immédiat (plus tard) : factures fournisseurs avec lignes &
 ## 6. Ordre et dépendances
 
 `v1.24 Avoir` → `v1.25 Balance âgée` (intègre les avoirs) → `v1.26 Achats & dépenses`
-→ **v1.27 Fournisseurs & paiements fournisseurs**.
+→ `v1.27 Fournisseurs & paiements fournisseurs` → **v1.28 Balance âgée fournisseurs &
+paquet comptable**.
 
 ### v1.27 — Fournisseurs & paiements fournisseurs
 Décisions validées : **règlements par achat** (comme les factures clients) et
@@ -152,8 +155,15 @@ Décisions validées : **règlements par achat** (comme les factures clients) et
   fournisseur » sur place).
 - `store.js` schéma **v5**, migration **v4 → v5**.
 
-## 7. Suite (v1.27)
+## 7. Suite (v1.28)
 
-`v1.27 Fournisseurs & paiements fournisseurs` : collection `suppliers` (schéma v5),
-écran Fournisseurs, rattachement dépense → fournisseur, règlements par achat
-(reste à payer), KPI dédiés, aide bilingue, tests.
+`v1.28 Balance âgée fournisseurs & paquet comptable` : le moteur d'ancienneté
+partagé (`aging.js`) gagne les **achats fournisseurs** (`expenseRows`/`expenseCsv`) ;
+l'écran « Balance âgée » propose un **sélecteur Clients / Fournisseurs** ; le
+**paquet comptable** (`export-pack.js`) ajoute le **journal des achats** (HT, TVA
+déductible, TTC, payé, reste, statut) et la **balance âgée fournisseurs** (CSV + ODS
+bilingues), et le manifeste compte les achats et règlements fournisseurs. Aide
+bilingue et tests mis à jour (aucune migration de schéma).
+
+Piste suivante : déclaration TVA `collectée − déductible` consolidée, rapprochement
+des débits, factures fournisseurs avec lignes et échéances.

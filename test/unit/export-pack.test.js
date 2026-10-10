@@ -43,6 +43,11 @@ function fixture() {
     transactions: [
       { id: 't1', date: '2026-09-20', label: 'VIREMENT DUPONT', amount: 1200, status: 'matched', linkedInvoiceId: 'f1' }
     ],
+    suppliers: [{ id: 's1', name: 'Fournitures Maroc' }],
+    expenses: [
+      { id: 'e1', supplierId: 's1', supplier: 'Fournitures Maroc', label: 'Achat papier', category: 'Fournitures', date: '2026-09-08', amountTTC: 1200, tvaRate: 20, payments: [{ id: 'sp1', date: '2026-09-09', amount: 400 }] },
+      { id: 'e2', supplier: 'Bailleur', label: 'Loyer', category: 'Loyer', date: '2026-09-01', amountTTC: 1000, tvaRate: 0, payments: [] }
+    ],
     rules: [],
     meta: { invoiceSeq: 2 }
   };
@@ -50,16 +55,41 @@ function fixture() {
 
 const PERIOD = { from: '2026-09-01', to: '2026-09-30', appVersion: '1.14.0' };
 
-test('paquet : 11 fichiers au périmètre, dont les 4 ODS', () => {
+test('paquet : 15 fichiers au périmètre, dont les 6 ODS', () => {
   const p = pack.buildPack(fixture(), PERIOD);
-  assert.strictEqual(p.files.length, 11);
+  assert.strictEqual(p.files.length, 15);
   const names = p.files.map((f) => f.name);
   assert.ok(names.some((n) => n.endsWith('journal.ods')));
   assert.ok(names.some((n) => n.endsWith('tva.ods')));
   assert.ok(names.some((n) => n.endsWith('encaissements.ods')));
   assert.ok(names.some((n) => n.endsWith('balance-agee.ods')));
+  assert.ok(names.some((n) => n.endsWith('achats.ods')));
+  assert.ok(names.some((n) => n.endsWith('balance-agee-fournisseurs.ods')));
   assert.ok(names.some((n) => n.endsWith('infos.json')));
   assert.ok(names.some((n) => n.endsWith('empreinte.txt')));
+});
+
+test('achats : journal des achats (HT / TVA déductible / TTC, payé, reste)', () => {
+  const p = pack.buildPack(fixture(), PERIOD);
+  const csv = p.files.find((f) => f.name.endsWith('achats.csv')).buf.toString('utf8');
+  assert.ok(csv.includes('Fournisseur'));
+  assert.ok(csv.includes('TVA déductible'));
+  // e1 : 1200 TTC à 20 % → 1000 HT + 200 TVA ; 400 payé, reste 800.
+  assert.ok(/Fournitures Maroc;Achat papier;Fournitures;1000\.00;200\.00;1200\.00;400\.00;800\.00;Partiel/.test(csv), csv);
+});
+
+test('balance âgée fournisseurs : reste à payer par fournisseur (reste net des règlements)', () => {
+  const p = pack.buildPack(fixture(), PERIOD);
+  const csv = p.files.find((f) => f.name.endsWith('balance-agee-fournisseurs.csv')).buf.toString('utf8');
+  assert.ok(csv.includes('Fournisseur'));
+  assert.ok(/Fournitures Maroc;Achat papier;2026-09-08;1200\.00;400\.00;800\.00;\d+;/.test(csv), csv);
+  assert.ok(/Bailleur;Loyer;2026-09-01;1000\.00;0\.00;1000\.00;\d+;/.test(csv), csv);
+});
+
+test('manifeste : compteurs achats et règlements fournisseurs', () => {
+  const p = pack.buildPack(fixture(), PERIOD);
+  assert.strictEqual(p.manifest.counts.expenses, 2);
+  assert.strictEqual(p.manifest.counts.supplierPayments, 1);
 });
 
 test('manifeste : empreinte = recalcul sur les fichiers de données', () => {

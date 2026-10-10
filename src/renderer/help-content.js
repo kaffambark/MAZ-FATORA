@@ -398,31 +398,35 @@
       category: 'screen', screen: 'balance', priority: 1,
       title: { fr: 'La balance âgée', ar: 'أعمار الديون' },
       goal: {
-        fr: "Voir ce qui reste à encaisser par client, classé par ancienneté (retard).",
-        ar: 'معرفة ما تبقّى للتحصيل حسب العميل، مرتّبًا حسب القدم (التأخر).'
+        fr: "Voir ce qui reste à encaisser (clients) ou à payer (fournisseurs), classé par ancienneté (retard).",
+        ar: 'معرفة ما تبقّى للتحصيل (العملاء) أو للدفع (الموردون)، مرتّبًا حسب القدم (التأخر).'
       },
       steps: {
         fr: [
           'Ouvrez « Balance âgée ».',
-          'Filtrez par client, n° de facture ou par tranche d’ancienneté.',
-          'Les colonnes montrent Total TTC, encaissé, avoirs et reste dû.',
+          'Choisissez « Clients » ou « Fournisseurs » en haut de l’écran.',
+          'Filtrez par nom, n° de facture/libellé ou par tranche d’ancienneté.',
+          'Les colonnes montrent Total TTC, payé/encaissé et reste dû.',
           'Exportez la balance en CSV pour votre comptable si besoin.'
         ],
         ar: [
           'افتح «أعمار الديون».',
-          'رشّح حسب العميل أو رقم الفاتورة أو شريحة القدم.',
-          'تُظهر الأعمدة المجموع شامل الضريبة، المقبوض، الإشعارات والباقي.',
+          'اختر «العملاء» أو «الموردون» في أعلى الشاشة.',
+          'رشّح حسب الاسم أو رقم الفاتورة/البيان أو شريحة القدم.',
+          'تُظهر الأعمدة المجموع شامل الضريبة والمقبوض/المدفوع والباقي.',
           'صدّر أعمار الديون بصيغة CSV لمحاسبك عند الحاجة.'
         ]
       },
       tips: {
         fr: [
-          'Le reste dû déduit automatiquement les encaissements et les avoirs validés.',
-          'Une échéance du jour ou future compte comme « Non échue ».'
+          'Côté clients, les encaissements et les avoirs validés réduisent le reste dû ; côté fournisseurs, ce sont les règlements qui réduisent le reste à payer.',
+          'L’ancienneté fournisseurs se compte depuis la date d’achat.',
+          'Le paquet comptable contient aussi le journal des achats et la balance âgée fournisseurs.'
         ],
         ar: [
-          'يُخصم الباقي تلقائيًا المقبوضات والإشعارات الدائنة المعتمدة.',
-          'الاستحقاق في اليوم أو مستقبلًا يُحتسب «غير مستحق».'
+          'بالنسبة للعملاء، تُنقص المقبوضات والإشعارات الدائنة المعتمدة من الباقي؛ وبالنسبة للموردين، تُنقص التسديدات من الباقي للدفع.',
+          'يُحسب قدم الموردين انطلاقًا من تاريخ الشراء.',
+          'تتضمن الحزمة المحاسبية أيضًا سجل المشتريات وأعمار ديون الموردين.'
         ]
       },
       related: ['screen.payments', 'screen.invoices', 'screen.credits']
@@ -953,8 +957,8 @@
         ]
       },
       tips: {
-        fr: ['Le paquet contient journal, TVA par taux, encaissements, balance âgée et PDF des factures.'],
-        ar: ['تضمّ الحزمة اليومية، الضريبة حسب النسبة، التحصيلات، الميزانية العمرية و PDF الفواتير.']
+        fr: ['Le paquet contient journal des ventes, TVA par taux, encaissements, balance âgée clients, journal des achats, balance âgée fournisseurs, rapprochement bancaire et PDF des factures.'],
+        ar: ['تضمّ الحزمة سجل المبيعات، الضريبة حسب النسبة، التحصيلات، أعمار ديون العملاء، سجل المشتريات، أعمار ديون الموردين، المطابقة البنكية و PDF الفواتير.']
       },
       related: ['screen.settings', 'faq.backup', 'task.import-bank']
     },

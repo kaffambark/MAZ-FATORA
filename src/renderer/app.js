@@ -1005,6 +1005,7 @@ function renderCredits() {
    comptable. Les avoirs validés sont déduits du reste dû. */
 
 const BAL_KEYS = { 'notdue': 'bal.tNotdue', '0-30': 'bal.t030', '31-60': 'bal.t3160', '61-90': 'bal.t6190', '90+': 'bal.t90' };
+let balScope = 'clients';
 
 function bucketLabel(id) {
   return tr(BAL_KEYS[id] || 'bal.tNotdue');
@@ -1016,12 +1017,33 @@ function balanceData() {
   return built;
 }
 
+/* Balance âgée FOURNISSEURS (dettes) : le MÊME moteur que les clients
+   (AGING.expenseRows), appliqué aux achats/dépenses. Le nom du fournisseur
+   vient de l'annuaire quand l'achat y est rattaché. */
+function balanceSuppliersData() {
+  const built = AGING.expenseRows(state.expenses, { ref: AGING.todayISO() });
+  built.rows.forEach((r) => {
+    const e = expenseById(r.id);
+    const name = (e && supplierNameOf(e)) || r.supplierName || '';
+    if (name) r.supplierName = name;
+  });
+  return built;
+}
+
 function renderBalance() {
-  const built = balanceData();
+  const isSup = balScope === 'suppliers';
+  const built = isSup ? balanceSuppliersData() : balanceData();
   const b = built.buckets;
   const overdue = round2(b['0-30'] + b['31-60'] + b['61-90'] + b['90+']);
+
+  /* Libellés dépendants du périmètre (clients par défaut). */
+  $('#bal-title').textContent = tr(isSup ? 'bal.titleSup' : 'bal.title');
+  $('#bal-hint').textContent = tr(isSup ? 'bal.hintSup' : 'bal.hint');
+  const searchEl = $('#bal-search');
+  if (searchEl) searchEl.setAttribute('placeholder', tr(isSup ? 'bal.searchSup' : 'bal.search'));
+
   $('#bal-stat-total').textContent = money(built.totals.rest);
-  $('#bal-stat-total-sub').textContent = tr('bal.nInvoices', { n: built.n });
+  $('#bal-stat-total-sub').textContent = tr(isSup ? 'bal.nExpenses' : 'bal.nInvoices', { n: built.n });
   $('#bal-stat-notdue').textContent = money(b.notdue);
   $('#bal-stat-overdue').textContent = money(overdue);
   $('#bal-stat-over90').textContent = money(b['90+']);
@@ -1029,12 +1051,26 @@ function renderBalance() {
   const q = norm($('#bal-search').value);
   const f = $('#bal-filter').value;
   let list = built.rows;
-  if (q) list = list.filter((r) => norm(r.number + ' ' + r.clientName).includes(q));
+  if (isSup) {
+    if (q) list = list.filter((r) => norm(r.label + ' ' + r.supplierName).includes(q));
+  } else if (q) {
+    list = list.filter((r) => norm(r.number + ' ' + r.clientName).includes(q));
+  }
   if (f && f !== 'all') {
     list = (f === 'overdue') ? list.filter((r) => r.bucket !== 'notdue') : list.filter((r) => r.bucket === f);
   }
 
-  const rows = built.rows && list.map((r) => `
+  const rows = list.map((r) => (isSup ? `
+    <tr>
+      <td>${esc(r.supplierName || tr('exp.noSupplier'))}</td>
+      <td><strong>${esc(r.label || '—')}</strong></td>
+      <td>${dateFR(r.date)}</td>
+      <td class="num">${money(r.totalTTC)}</td>
+      <td class="num">${money(r.paid)}</td>
+      <td class="num"><strong>${money(r.rest)}</strong></td>
+      <td class="num">${r.days}</td>
+      <td>${bucketPill(r.bucket)}</td>
+    </tr>` : `
     <tr>
       <td>${esc(r.clientName || tr('common.noClient'))}</td>
       <td><strong>${esc(r.number || '—')}</strong></td>
@@ -1045,15 +1081,21 @@ function renderBalance() {
       <td class="num"><strong>${money(r.rest)}</strong></td>
       <td class="num">${r.days}</td>
       <td>${bucketPill(r.bucket)}</td>
-    </tr>`).join('');
+    </tr>`)).join('');
 
-  $('#bal-table').innerHTML = `
+  $('#bal-table').innerHTML = (isSup ? `
+    <thead><tr>
+      <th>${tr('bal.hSupplier')}</th><th>${tr('bal.hLabel')}</th><th>${tr('bal.hDate')}</th>
+      <th class="num">${tr('bal.hTTC')}</th><th class="num">${tr('bal.hPaye')}</th>
+      <th class="num">${tr('bal.hRest')}</th><th class="num">${tr('bal.hDays')}</th><th>${tr('bal.hBucket')}</th>
+    </tr></thead>
+    <tbody>${rows || `<tr><td colspan="8" class="empty">${tr('bal.emptySup')}</td></tr>`}</tbody>` : `
     <thead><tr>
       <th>${tr('bal.hClient')}</th><th>${tr('bal.hNumber')}</th><th>${tr('bal.hDue')}</th>
       <th class="num">${tr('bal.hTTC')}</th><th class="num">${tr('bal.hPaid')}</th><th class="num">${tr('bal.hCredit')}</th>
       <th class="num">${tr('bal.hRest')}</th><th class="num">${tr('bal.hDays')}</th><th>${tr('bal.hBucket')}</th>
     </tr></thead>
-    <tbody>${rows || `<tr><td colspan="9" class="empty">${tr('bal.empty')}</td></tr>`}</tbody>`;
+    <tbody>${rows || `<tr><td colspan="9" class="empty">${tr('bal.empty')}</td></tr>`}</tbody>`);
 
   const order = ['notdue', '0-30', '31-60', '61-90', '90+'];
   $('#bal-buckets').innerHTML = `
@@ -1068,14 +1110,19 @@ function bucketPill(id) {
 }
 
 async function exportBalanceCsv() {
-  const built = balanceData();
-  const labels = {
+  const isSup = balScope === 'suppliers';
+  const built = isSup ? balanceSuppliersData() : balanceData();
+  const labels = isSup ? {
+    supplier: tr('bal.hSupplier'), label: tr('bal.hLabel'), date: tr('common.date'),
+    ttc: tr('bal.hTTC'), paid: tr('bal.hPaye'), rest: tr('bal.hRest'),
+    days: tr('bal.hDays'), bucket: tr('bal.hBucket')
+  } : {
     client: tr('bal.hClient'), number: tr('bal.hNumber'), issue: tr('common.date'),
     due: tr('bal.hDue'), ttc: tr('bal.hTTC'), paid: tr('bal.hPaid'), credited: tr('bal.hCredit'),
     rest: tr('bal.hRest'), days: tr('bal.hDays'), bucket: tr('bal.hBucket')
   };
-  const text = AGING.csv(built, labels);
-  const suggestedName = 'balance-agee-' + todayISO() + '.csv';
+  const text = isSup ? AGING.expenseCsv(built, labels) : AGING.csv(built, labels);
+  const suggestedName = (isSup ? 'balance-agee-fournisseurs-' : 'balance-agee-') + todayISO() + '.csv';
   const res = await window.factapi.agingExportCsv({ text, suggestedName });
   if (!res || res.canceled) return;
   if (res.error) { toast(tr('common.error') + (res.msg || ''), 'error'); return; }
@@ -4230,6 +4277,11 @@ $('#credit-filter').addEventListener('change', renderCredits);
 $('#bal-search').addEventListener('input', renderBalance);
 $('#bal-filter').addEventListener('change', renderBalance);
 $('#btn-export-balance').addEventListener('click', exportBalanceCsv);
+$$('#bal-scope .scope-btn').forEach((btn) => btn.addEventListener('click', () => {
+  balScope = btn.dataset.scope === 'suppliers' ? 'suppliers' : 'clients';
+  $$('#bal-scope .scope-btn').forEach((x) => x.classList.toggle('active', x.dataset.scope === balScope));
+  renderBalance();
+}));
 /* Achats & dépenses */
 $('#exp-search').addEventListener('input', renderExpenses);
 $('#exp-filter').addEventListener('change', renderExpenses);
