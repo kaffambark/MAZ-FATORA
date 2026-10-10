@@ -635,6 +635,9 @@ function renderDashboard() {
   const wel = $('#welcome-banner');
   if (wel) wel.hidden = !!coName;
 
+  /* Onboarding : checklist « Mise en route » (masquée une fois complète) */
+  if (window.ONBOARD) window.ONBOARD.renderChecklist();
+
   renderCharts(m);
 
   $('#dash-drafts').innerHTML = drafts.slice(0, 6).map((inv) => `
@@ -2505,6 +2508,8 @@ async function exportBackup() {
     if (!res || res.canceled) return;
     if (res.error) { toast(tr('set.exportFail', { msg: res.msg || res.error }), 'error'); return; }
     toast(tr('set.exportDone', { path: res.path }), 'success');
+    /* Sauvegarde faite : coche l'étape correspondante de la mise en route. */
+    if (window.ONBOARD) window.ONBOARD.markBackup();
   } catch (e) {
     toast(tr('set.exportFail', { msg: e.message }), 'error');
   }
@@ -3391,6 +3396,12 @@ $('#btn-hide-welcome').addEventListener('click', () => {
   if (w) w.hidden = true;
 });
 
+/* ---- Onboarding : relancer la visite guidée depuis Paramètres → Aide ---- */
+const tourRestartBtn = $('#btn-tour-restart');
+if (tourRestartBtn) tourRestartBtn.addEventListener('click', () => {
+  if (window.ONBOARD) window.ONBOARD.start();
+});
+
 /* ---- Sélecteur de mois du tableau de bord ---- */
 const dashMonthSel = $('#dash-month');
 if (dashMonthSel) {
@@ -3509,6 +3520,8 @@ async function loadAppData() {
     renderAll();
     applyTheme();
     if (repairedIds) persist('invoices');
+    /* Onboarding : visite guidée à la première utilisation (jamais deux fois). */
+    if (window.ONBOARD) window.ONBOARD.maybeStart();
   } catch (e) {
     toast(tr('common.loadError', { msg: e.message }), 'error');
   }

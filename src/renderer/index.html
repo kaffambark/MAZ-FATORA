@@ -7,6 +7,7 @@
   <link rel="icon" type="image/png" href="../../Icon.png">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="help.css">
+  <link rel="stylesheet" href="onboarding.css">
 </head>
 <body>
   <!-- Sprite d'icônes (SVG inline, embarqué — pas de CDN, conforme CSP) -->
@@ -144,6 +145,16 @@
             <button class="btn primary" data-goto="settings" data-i18n="dash.goSettings">Configurer mon entreprise</button>
             <button class="btn" id="btn-hide-welcome" data-i18n="dash.hideWelcome">Plus tard</button>
           </div>
+        </div>
+
+        <!-- Onboarding : checklist « Mise en route » (masquée une fois terminée) -->
+        <div class="card setup-card" id="setup-card" hidden>
+          <div class="card-head">
+            <h2 data-i18n="setup.title">Mise en route</h2>
+            <span class="muted small" id="setup-progress"></span>
+          </div>
+          <p class="hint" data-i18n="setup.hint">Quelques étapes pour être opérationnel.</p>
+          <ul class="setup-list" id="setup-list"></ul>
         </div>
 
         <div class="stats">
@@ -762,6 +773,16 @@
           </div>
         </div>
 
+        <!-- AIDE : visite guidée + guide d'utilisation -->
+        <div class="card" id="card-help">
+          <div class="card-head"><h2 data-i18n="set.helpCard">Aide</h2></div>
+          <div class="row" style="margin-top:6px">
+            <button class="btn" id="btn-tour-restart">
+              <svg class="ic"><use href="#i-help"/></svg><span data-i18n="set.helpTour">Revoir la visite guidée</span>
+            </button>
+          </div>
+        </div>
+
         <!-- SÉCURITÉ : mot de passe (monoposte) -->
         <div class="card" id="card-security">
           <div class="card-head"><h2 data-i18n="sec.title">Sécurité</h2></div>
@@ -816,6 +837,22 @@
     </div>
   </div>
 
+  <!-- VISITE GUIDÉE (onboarding) -->
+  <div class="tour-layer" id="tour-root" hidden>
+    <div class="tour-hl" id="tour-hl" hidden></div>
+    <div class="tour-tip" id="tour-tip" role="dialog" aria-modal="true" aria-labelledby="tour-title">
+      <div class="tour-stepnum" id="tour-stepnum"></div>
+      <h3 id="tour-title"></h3>
+      <p id="tour-text"></p>
+      <div class="tour-actions">
+        <button type="button" class="btn" id="tour-skip">Passer</button>
+        <span class="tour-dots" id="tour-dots"></span>
+        <button type="button" class="btn" id="tour-prev">Précédent</button>
+        <button type="button" class="btn primary" id="tour-next">Suivant</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" hidden></div>
 
   <script src="i18n.js"></script>
@@ -824,6 +861,7 @@
   <script src="doc-config.js"></script>
   <script src="help-content.js"></script>
   <script src="help.js"></script>
+  <script src="onboarding.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

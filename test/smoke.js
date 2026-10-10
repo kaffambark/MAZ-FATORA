@@ -43,7 +43,8 @@ const storeStub = {
     paymentDelay: 30,
     invoicePrefix: 'FA',
     quotePrefix: 'DV',
-    quoteValidityDays: 30
+    quoteValidityDays: 30,
+    onboarded: true
   },
   clients: [{ id: 'c1', name: 'Dupont SARL', email: '', address: '', tvaNumber: '', phone: '' }],
   invoices: [],
@@ -203,7 +204,7 @@ ipcMain.handle('export:close-period', async (event, period) => {
   const pack = exportPack.buildPack(storeStub, {
     from: period && period.from,
     to: period && period.to,
-    appVersion: '1.19'
+    appVersion: '1.20'
   });
   const zipPath = path.join(__dirname, '.tmp', pack.base + '_cloture.zip');
   fs.writeFileSync(zipPath, exportPack.zipBuffer(pack.files));
@@ -211,7 +212,7 @@ ipcMain.handle('export:close-period', async (event, period) => {
 });
 
 /* Version de l'application (lue dans package.json par le vrai main.js) */
-ipcMain.handle('app:version', () => '1.19');
+ipcMain.handle('app:version', () => '1.20');
 
 function check(name, cond, detail) {
   if (cond) console.log('  ok   ' + name);
@@ -275,7 +276,7 @@ async function phaseUi() {
   check('logo posé sur fond blanc (lisibilité sur la sidebar bleue)',
     base.brandBg === 'rgb(255, 255, 255)', base.brandBg);
   check('favicon Icon.png déclaré', /Icon\.png/.test(base.favicon || ''), base.favicon);
-  check('version affichée dans la sidebar (v1.19)', base.version === 'v1.19', base.version);
+  check('version affichée dans la sidebar (v1.20)', base.version === 'v1.20', base.version);
   check('tableau de bord rempli', base.dashRendered);
   check('parseur CSV', !base.csvError && base.csv && base.csv.length === 3 &&
     base.csv[0].amount === 1200.5 && base.csv[1].amount === -25.5 && base.csv[2].amount === 34.99, base.csv || base.csvError);
@@ -2780,6 +2781,104 @@ async function phaseHelp(win) {
   await ev(win, `window.HELPUI.close(); window.I18N.setLang('fr'); true`);
 }
 
+/* ---- PHASE 1i : ONBOARDING (v1.20) ----
+   Vérifie la visite guidée (5 étapes, mise en évidence, navigation, « Passer »,
+   mémoire « ne plus réafficher », RTL) et la checklist « Mise en route »
+   alimentée par l'état réel de l'application. */
+async function phaseOnboarding(win) {
+  console.log('--- PHASE 1i : ONBOARDING (v1.20) ---');
+
+  await win.loadFile(path.join(__dirname, '..', 'src', 'renderer', 'index.html'));
+  await wait(900);
+
+  const api = await ev(win, `({
+    hasApi: !!window.ONBOARD,
+    autoHidden: document.querySelector('#tour-root').hidden,
+    checklistVisible: !document.querySelector('#setup-card').hidden
+  })`);
+  check('onboarding : moteur chargé, pas de visite automatique pour un habitué',
+    api.hasApi === true && api.autoHidden === true, api);
+  check('onboarding : checklist « Mise en route » affichée sur le tableau de bord',
+    api.checklistVisible === true, api);
+
+  /* Démarrage manuel de la visite guidée */
+  await ev(win, `(function () { state.settings.onboarded = false; window.ONBOARD.start(); return true; })()`);
+  await wait(120);
+  const s1 = await ev(win, `(function () {
+    return {
+      open: !document.querySelector('#tour-root').hidden,
+      active: window.ONBOARD.isActive(),
+      title: document.querySelector('#tour-title').textContent,
+      prevDisabled: document.querySelector('#tour-prev').disabled,
+      hlHidden: document.querySelector('#tour-hl').hidden,
+      focusInside: document.querySelector('#tour-tip').contains(document.activeElement)
+    };
+  })()`);
+  check('onboarding : 1re bulle centrée (bienvenue), sans mise en évidence',
+    s1.open && s1.active && s1.title === 'Bienvenue dans MAZ-FATORA' &&
+    s1.prevDisabled === true && s1.hlHidden === true, s1);
+  check('onboarding : focus déplacé dans la bulle', s1.focusInside === true, s1);
+
+  await ev(win, `document.querySelector('#tour-next').click(); true`);
+  await wait(80);
+  const s2 = await ev(win, `({
+    title: document.querySelector('#tour-title').textContent,
+    hlHidden: document.querySelector('#tour-hl').hidden,
+    prevDisabled: document.querySelector('#tour-prev').disabled
+  })`);
+  check('onboarding : étape « Vos écrans » avec mise en évidence de la navigation',
+    s2.title === 'Vos écrans' && s2.hlHidden === false && s2.prevDisabled === false, s2);
+
+  await ev(win, `document.querySelector('#tour-skip').click(); true`);
+  await wait(80);
+  const skip = await ev(win, `({ hidden: document.querySelector('#tour-root').hidden, active: window.ONBOARD.isActive(), seen: state.settings.onboarded === true })`);
+  check('onboarding : « Passer » ferme la visite et la mémorise',
+    skip.hidden === true && skip.active === false && skip.seen === true, skip);
+
+  await ev(win, `window.ONBOARD.maybeStart(); true`);
+  await wait(60);
+  const never = await ev(win, `document.querySelector('#tour-root').hidden`);
+  check('onboarding : la visite ne se réaffiche plus une fois vue', never === true, never);
+
+  /* Checklist : états dérivés de l'application */
+  const c0 = await ev(win, `(function () {
+    window.ONBOARD.renderChecklist();
+    return {
+      visible: !document.querySelector('#setup-card').hidden,
+      items: document.querySelectorAll('#setup-list .setup-item').length,
+      done: document.querySelectorAll('#setup-list .setup-item.done').length,
+      progress: document.querySelector('#setup-progress').textContent
+    };
+  })()`);
+  check('onboarding : checklist composée de 5 étapes, progression calculée',
+    c0.visible === true && c0.items === 5 && c0.done >= 1 && /sur 5/.test(c0.progress), c0);
+
+  const c1 = await ev(win, `(function () {
+    state.settings.setupChecklist = { backup: true };
+    state.invoices.push({ id: 'tmp-onb', status: 'validated', lines: [], payments: [{ id: 'p1', amount: 10 }] });
+    window.ONBOARD.renderChecklist();
+    return {
+      hidden: document.querySelector('#setup-card').hidden,
+      done: document.querySelectorAll('#setup-list .setup-item.done').length
+    };
+  })()`);
+  check('onboarding : checklist masquée une fois la mise en route terminée',
+    c1.hidden === true && c1.done === 5, c1);
+  await ev(win, `state.invoices = state.invoices.filter((i) => i.id !== 'tmp-onb'); true`);
+
+  /* Arabe : RTL + libellés traduits */
+  await ev(win, `(function () { window.I18N.setLang('ar'); state.settings.onboarded = false; window.ONBOARD.start(); return true; })()`);
+  await wait(80);
+  const ar = await ev(win, `({
+    dir: document.documentElement.getAttribute('dir'),
+    title: document.querySelector('#tour-title').textContent,
+    next: document.querySelector('#tour-next').textContent
+  })`);
+  check('onboarding : visite en arabe (RTL + libellés traduits)',
+    ar.dir === 'rtl' && ar.title === 'مرحبًا بك في MAZ-FATORA' && ar.next === 'التالي', ar);
+  await ev(win, `document.querySelector('#tour-skip').click(); window.I18N.setLang('fr'); true`);
+}
+
 (async function main() {
   try {
     await app.whenReady();
@@ -2798,6 +2897,7 @@ async function phaseHelp(win) {
     await phaseQuotes(uiWin);
     await phaseComptabilisation(uiWin);
     await phaseDocModel(uiWin);
+    await phaseOnboarding(uiWin);
     await phaseHelp(uiWin);
   } catch (e) {
     problems.push('exception: ' + (e && e.stack ? e.stack : e));

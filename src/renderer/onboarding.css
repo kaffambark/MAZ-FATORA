@@ -1,0 +1,111 @@
+/* MAZ-FATORA — styles de l'onboarding (onboarding.js) :
+   visite guidée (bulles) et checklist « Mise en route ».
+   Réutilise les jetons de styles.css et suit le thème clair/sombre + RTL. */
+
+/* --- Checklist « Mise en route » (tableau de bord) --- */
+.setup-card .card-head { align-items: baseline; }
+.setup-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+.setup-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 4px;
+  border-bottom: 1px solid var(--border);
+}
+.setup-item:last-child { border-bottom: none; }
+.setup-ic {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1.5px solid var(--border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+.setup-item.done .setup-ic {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary-2);
+}
+.setup-ic .ic { width: 13px; height: 13px; }
+.setup-label { flex: 1; font-size: 14px; }
+.setup-item.done .setup-label { color: var(--muted); }
+.setup-badge {
+  font-size: 12px;
+  color: var(--primary-2);
+  background: var(--primary-soft);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
+/* --- Visite guidée --- */
+.tour-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+}
+.tour-hl {
+  position: fixed;
+  border-radius: 10px;
+  border: 2px solid var(--primary);
+  box-shadow: 0 0 0 9999px rgba(8, 13, 26, .62);
+  pointer-events: none;
+  transition: all .18s ease;
+}
+.tour-tip {
+  position: fixed;
+  width: min(340px, calc(100vw - 24px));
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-lg);
+  padding: 18px 20px;
+  text-align: start;
+}
+.tour-tip.tour-center {
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+.tour-stepnum {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--muted);
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.tour-tip h3 { margin: 0 0 6px; font-size: 18px; letter-spacing: -.2px; }
+.tour-tip p { margin: 0; font-size: 14px; line-height: 1.55; color: var(--text-soft); }
+.tour-dots {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  margin: 0 6px;
+}
+.tour-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--border);
+  transition: background .15s ease;
+}
+.tour-dot.active { background: var(--primary); }
+.tour-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+.tour-actions .tour-spacer { flex: 1; }
+.tour-actions #tour-prev { margin-inline-start: auto; }
+
+@media (max-width: 560px) {
+  .tour-tip { width: calc(100vw - 20px); }
+}

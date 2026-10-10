@@ -47,10 +47,26 @@ npm test
 
 ## Version
 
-La **version** s'affiche en bas de la barre latérale (ex. `v1.19`). À **chaque modification** du
+La **version** s'affiche en bas de la barre latérale (ex. `v1.20`). À **chaque modification** du
 projet, le champ `version` de `package.json` est incrémenté par la **partie mineure**
 (`1.0` → `1.1` → `1.2` …) et l'application affiche `major.minor`. Les noms d'installateurs
-reprennent la version complète (`1.19.0`).
+reprennent la version complète (`1.20.0`).
+
+## v1.20 — Mise en route guidée (onboarding bilingue)
+
+Aide au **premier lancement**, sans ressource réseau :
+
+- **Visite guidée** en 5 bulles, à la **première utilisation** : bienvenue, puis survol de la
+  navigation, de l'import, de la validation des factures et des paiements. Les éléments réels
+  de l'interface sont **mis en évidence**; navigation *Précédent / Suivant*, **Passer**
+  toujours disponible, fermeture par `Échap` ou flèches ←/→ ;
+- **Fermée une fois, elle ne réapparaît plus** (`settings.onboarded`) ; elle est
+  **réactivable** depuis *Paramètres → Aide → « Revoir la visite guidée »* ;
+- **Checklist « Mise en route »** sur le tableau de bord : société configurée, premier client,
+  première facture validée, premier encaissement, sauvegarde. Les étapes sont **déduites de
+  l'état réel** de l'application et la carte **disparaît une fois tout terminé** ;
+- **Bilingue FR/AR** (RTL) avec **parité vérifiée par test** ; contenu dans
+  `onboarding.js` / `onboarding.css`, libellés `tour.*` / `setup.*`.
 
 ## v1.19 — Centre d'aide intégré (bilingue, hors ligne)
 
@@ -504,6 +520,8 @@ src/
     help-content.js     Contenu du Centre d'aide (source unique FR/AR)
     help.js             Moteur du Centre d'aide (sommaire, recherche, F1, RTL)
     help.css            Styles du Centre d'aide
+    onboarding.js       Onboarding : visite guidée + checklist « Mise en route »
+    onboarding.css      Styles de l'onboarding (bulles, checklist)
     print-doc.css       Styles des documents : modèles, couleurs, densité, filigrane, RTL
     print-doc.js        Moteur de rendu unique des documents (facture OU devis)
     print-invoice.*     Entrée impression FACTURE (type + moteur partagé)
