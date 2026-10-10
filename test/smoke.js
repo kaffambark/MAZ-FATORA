@@ -59,6 +59,7 @@ const storeStub = {
   ],
   rules: [],
   expenses: [],
+  suppliers: [],
   meta: { invoiceSeq: 0, quoteSeq: 0, creditSeq: 0 }
 };
 
@@ -220,7 +221,7 @@ ipcMain.handle('export:close-period', async (event, period) => {
   const pack = exportPack.buildPack(storeStub, {
     from: period && period.from,
     to: period && period.to,
-    appVersion: '1.26'
+    appVersion: '1.27'
   });
   const zipPath = path.join(__dirname, '.tmp', pack.base + '_cloture.zip');
   fs.writeFileSync(zipPath, exportPack.zipBuffer(pack.files));
@@ -228,7 +229,7 @@ ipcMain.handle('export:close-period', async (event, period) => {
 });
 
 /* Version de l'application (lue dans package.json par le vrai main.js) */
-ipcMain.handle('app:version', () => '1.26');
+ipcMain.handle('app:version', () => '1.27');
 
 function check(name, cond, detail) {
   if (cond) console.log('  ok   ' + name);
@@ -286,13 +287,13 @@ async function phaseUi() {
   })()`);
 
   check('API preload présente', base.hasApi);
-  check('13 vues rendues (dont Avoirs, Balance âgée, Achats & dépenses, Paiements, Devis)', base.views === 13, base.views);
+  check('14 vues rendues (dont Avoirs, Balance âgée, Achats & dépenses, Fournisseurs, Paiements, Devis)', base.views === 14, base.views);
   check('nom de l\'application = MAZ-FATORA', base.title === 'MAZ-FATORA', base.title);
   check('logo de marque chargé (Logo.png)', base.logo && base.logo.ok, base.logo);
   check('logo posé sur fond blanc (lisibilité sur la sidebar bleue)',
     base.brandBg === 'rgb(255, 255, 255)', base.brandBg);
   check('favicon Icon.png déclaré', /Icon\.png/.test(base.favicon || ''), base.favicon);
-  check('version affichée dans la sidebar (v1.26)', base.version === 'v1.26', base.version);
+  check('version affichée dans la sidebar (v1.27)', base.version === 'v1.27', base.version);
   check('tableau de bord rempli', base.dashRendered);
   check('parseur CSV', !base.csvError && base.csv && base.csv.length === 3 &&
     base.csv[0].amount === 1200.5 && base.csv[1].amount === -25.5 && base.csv[2].amount === 34.99, base.csv || base.csvError);
@@ -645,8 +646,8 @@ async function phaseExtras(win) {
       dbPath: (document.querySelector('#set-db-path') || {}).value || ''
     };
   })()`);
-  check('13 vues et 13 entrées de menu (vues Avoirs, Balance âgée et Achats & dépenses)',
-    entry.views === 13 && entry.navs === 13, entry);
+  check('14 vues et 14 entrées de menu (vues Avoirs, Balance âgée, Achats & dépenses et Fournisseurs)',
+    entry.views === 14 && entry.navs === 14, entry);
   check('accès « Nouvelle facture » (tableau de bord + factures validées)',
     entry.dashBtn && entry.invBtn, entry);
   check('vue Paiements : recherche et filtre présents', entry.payFilters, entry);
@@ -992,8 +993,8 @@ async function phaseExtras(win) {
       payments: val[0] ? (val[0].payments || []).length : -1
     };
   })()`);
-  check('état final propre (13 vues, modale fermée, base affichée, 1 règlement)',
-    final.views === 13 && final.modalHidden && final.dbPath === DATA_DIR && final.payments === 1, final);
+  check('état final propre (14 vues, modale fermée, base affichée, 1 règlement)',
+    final.views === 14 && final.modalHidden && final.dbPath === DATA_DIR && final.payments === 1, final);
 }
 
 async function phasePdf(uiWin) {
@@ -1855,7 +1856,7 @@ async function phaseSecurite(uiWin) {
   })()`);
   check('3 : sans protection, l\'application s\'ouvre normalement (pas d\'écran de verrouillage)',
     s0.lockHidden === true && s0.lockBtnHidden === true && s0.hasSecCard === true &&
-    s0.enableHidden === false && s0.views === 13 && s0.dash.length > 0, s0);
+    s0.enableHidden === false && s0.views === 14 && s0.dash.length > 0, s0);
 
   /* --- b) activation : Paramètres → Sécurité → « Activer la protection » --- */
   await ev(win, `showView('settings'); true`);
@@ -2808,7 +2809,7 @@ async function phaseHelp(win) {
     };
   })()`);
   check('aide : contenu et moteur chargés',
-    loaded.hasContent && loaded.hasUi && loaded.articles >= 45 && loaded.cats >= 5 && loaded.screens === 13, loaded);
+    loaded.hasContent && loaded.hasUi && loaded.articles >= 46 && loaded.cats >= 5 && loaded.screens === 14, loaded);
 
   const triggers = await ev(win, `(function () {
     return {
@@ -2818,7 +2819,7 @@ async function phaseHelp(win) {
     };
   })()`);
   check('aide : bouton latéral présent', triggers.side === true, triggers);
-  check('aide : bouton « ? » sur chaque écran', triggers.screenBtns === 13, triggers);
+  check('aide : bouton « ? » sur chaque écran', triggers.screenBtns === 14, triggers);
 
   await ev(win, `(function () {
     showView('invoices');
@@ -3039,7 +3040,7 @@ async function phaseGuide(win) {
   })()`);
   check('guide : couverture, sommaire, articles et aide-mémoire rendus (FR)',
     fr.dir === 'ltr' && fr.title === 'Guide d’utilisation' && fr.toc && fr.memo && fr.articles >= 40, fr);
-  check('guide : version affichée sur la couverture', /v1\.26/.test(fr.coverText), fr.coverText.slice(0, 100));
+  check('guide : version affichée sur la couverture', /v1\.27/.test(fr.coverText), fr.coverText.slice(0, 100));
 
   const pdf = await win.webContents.printToPDF({ printBackground: true, pageSize: 'A4' });
   check('guide : export PDF non vide (%PDF)',
@@ -3270,7 +3271,7 @@ async function phaseExpenses(win) {
       tva: document.querySelector('#exp-stat-tva').textContent,
       count: document.querySelector('#exp-stat-count').textContent,
       rows: document.querySelectorAll('#exp-table tbody tr').length,
-      pills: document.querySelectorAll('#exp-table tbody .pill').length
+      pills: document.querySelectorAll('#exp-table tbody .pill.blue').length
     };
   })()`);
   /* x1 : 1 200 TTC (TVA 200) ; x2 : 1 000 → total 2 200,00 ; TVA 200,00 */
@@ -3290,19 +3291,25 @@ async function phaseExpenses(win) {
   })()`);
   check('dépenses : filtre par catégorie « Fournitures » → 1 ligne', filtered.rows === 1, filtered);
 
-  /* Saisie manuelle via l'éditeur */
+  /* Saisie manuelle via l'éditeur, avec création d'un fournisseur sur place */
   await ev(win, `(function () {
     document.querySelector('#btn-new-expense').click();
     document.querySelector('#ex-label').value = 'Carburant voiture';
     document.querySelector('#ex-amount').value = '600';
-    document.querySelector('#ex-supplier').value = 'Station Z';
+    document.querySelector('#ex-newsup-name').value = 'Station Z';
     document.querySelector('#ex-category').value = 'Déplacements';
     document.querySelector('#ex-save').click();
   })()`);
   await wait(350);
-  const added = await ev(win, `(function () { const e = state.expenses[state.expenses.length - 1]; return { n: state.expenses.length, label: e.label, amount: e.amountTTC }; })()`);
+  const added = await ev(win, `(function () {
+    const e = state.expenses[state.expenses.length - 1];
+    const s = state.suppliers[state.suppliers.length - 1] || {};
+    return { n: state.expenses.length, label: e.label, amount: e.amountTTC, supplier: e.supplier, supplierId: !!e.supplierId, supName: s.name, supN: state.suppliers.length };
+  })()`);
   check('dépenses : ajout manuel (éditeur) → 3 dépenses, montant TTC conservé',
     added.n === 3 && added.label === 'Carburant voiture' && added.amount === 600, added);
+  check('dépenses : fournisseur créé sur place et rattaché à l\'achat',
+    added.n === 3 && added.supplier === 'Station Z' && added.supplierId && added.supName === 'Station Z' && added.supN === 1, added);
 
   /* Import des débits → dépenses */
   const imported = await ev(win, `(async function () {
@@ -3345,6 +3352,87 @@ async function phaseExpenses(win) {
     { name: csv.suggestedName, sample: String(csv.text || '').slice(0, 160) });
 }
 
+/* ---- PHASE : fournisseurs & paiements fournisseurs (v1.27) ----
+   Annuaire fournisseurs (création, total achats / reste à payer, suppression
+   avec détachement), et règlements par achat (partiel puis complet). */
+async function phaseSuppliers(win) {
+  console.log('--- PHASE : FOURNISSEURS & PAIEMENTS FOURNISSEURS (v1.27) ---');
+  await win.loadFile(path.join(__dirname, '..', 'src', 'renderer', 'index.html'));
+  await wait(900);
+
+  const view = await ev(win, `(function () {
+    state.suppliers = [
+      { id: 's1', name: 'Papeterie Ali', email: 'ali@ex.ma', phone: '0522000000', tvaNumber: 'IF-1', address: 'Casablanca' },
+      { id: 's2', name: 'Bailleur', email: '', phone: '', tvaNumber: '', address: '' }
+    ];
+    state.expenses = [
+      { id: 'e1', source: 'manual', date: '2026-09-05', label: 'Fournitures', supplierId: 's1', supplier: 'Papeterie Ali', category: 'Fournitures', amountTTC: 1200, tvaRate: 20, method: 'cash', payments: [] },
+      { id: 'e2', source: 'manual', date: '2026-09-06', label: 'Loyer', supplierId: 's2', supplier: 'Bailleur', category: 'Loyer', amountTTC: 1000, tvaRate: 0, payments: [ { id: 'p1', date: '2026-09-06', amount: 1000, method: 'transfer', reference: '', note: '' } ] }
+    ];
+    renderAll();
+    showView('suppliers');
+    return {
+      views: document.querySelectorAll('.view').length,
+      rows: document.querySelectorAll('#supplier-table tbody tr').length,
+      count: document.querySelector('#sup-stat-count').textContent,
+      total: document.querySelector('#sup-stat-total').textContent,
+      due: document.querySelector('#sup-stat-due').textContent
+    };
+  })()`);
+  check('fournisseurs : 2 fournisseurs, total achats 2 200,00, reste 1 200,00 (14 vues)',
+    view.views === 14 && view.rows === 2 && view.count === '2' &&
+    /2\s?200,00/.test(view.total) && /1\s?200,00/.test(view.due), view);
+
+  /* Règlement partiel d'un achat à crédit (500 sur 1 200) */
+  const partial = await ev(win, `(async function () {
+    openExpensePaymentModal('e1');
+    document.querySelector('#expay-amount').value = '500';
+    document.querySelector('#expay-save').click();
+    await new Promise(function (r) { setTimeout(r, 300); });
+    const e = state.expenses.find(function (x) { return x.id === 'e1'; });
+    return { paid: expensePaid(e), rest: expenseRest(e), status: expenseStatus(e), n: expensePaymentList(e).length };
+  })()`);
+  check('paiement fournisseur : règlement partiel 500 → payé 500, reste 700, statut partiel',
+    partial.paid === 500 && partial.rest === 700 && partial.status === 'partial' && partial.n === 1, partial);
+
+  /* Règlement complet via « Tout régler » */
+  await ev(win, `(function () {
+    openExpensePaymentModal('e1');
+    document.querySelector('#expay-all').click();
+    document.querySelector('#expay-save').click();
+  })()`);
+  await wait(350);
+  const paid = await ev(win, `(function () {
+    const e = state.expenses.find(function (x) { return x.id === 'e1'; });
+    return { paid: expensePaid(e), rest: expenseRest(e), status: expenseStatus(e), n: expensePaymentList(e).length };
+  })()`);
+  check('paiement fournisseur : « Tout régler » → payé 1 200, reste 0, statut payé',
+    paid.paid === 1200 && paid.rest === 0 && paid.status === 'paid' && paid.n === 2, paid);
+
+  /* Création d'un fournisseur via l'annuaire */
+  const created = await ev(win, `(async function () {
+    document.querySelector('#btn-new-supplier').click();
+    document.querySelector('#sup-name').value = 'Nouveau Fournisseur';
+    document.querySelector('#sup-save').click();
+    await new Promise(function (r) { setTimeout(r, 250); });
+    return { n: state.suppliers.length, name: state.suppliers[state.suppliers.length - 1].name };
+  })()`);
+  check('fournisseurs : création via l\'annuaire (3 fournisseurs)',
+    created.n === 3 && created.name === 'Nouveau Fournisseur', created);
+
+  /* Suppression d'un fournisseur référencé : détachement sans supprimer l'achat */
+  const deleted = await ev(win, `(async function () {
+    const p = deleteSupplier('s2');
+    await new Promise(function (r) { setTimeout(r, 120); });
+    document.querySelector('#cf-ok').click();
+    await p;
+    const e = state.expenses.find(function (x) { return x.id === 'e2'; });
+    return { n: state.suppliers.length, hasS2: !!state.suppliers.find(function (s) { return s.id === 's2'; }), expSup: e ? e.supplierId : 'missing', text: e ? e.supplier : '' };
+  })()`);
+  check('fournisseurs : suppression détache l\'achat (2 fournisseurs, achat conservé)',
+    deleted.n === 2 && deleted.hasS2 === false && deleted.expSup === null && deleted.text === 'Bailleur', deleted);
+}
+
 (async function main() {
   try {
     await app.whenReady();
@@ -3369,6 +3457,7 @@ async function phaseExpenses(win) {
     await phaseCredits(uiWin);
     await phaseBalance(uiWin);
     await phaseExpenses(uiWin);
+    await phaseSuppliers(uiWin);
   } catch (e) {
     problems.push('exception: ' + (e && e.stack ? e.stack : e));
   }

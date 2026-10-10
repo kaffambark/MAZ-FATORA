@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const COLLECTIONS = ['settings', 'clients', 'invoices', 'transactions', 'rules', 'quotes', 'creditNotes', 'expenses', 'meta'];
+const COLLECTIONS = ['settings', 'clients', 'invoices', 'transactions', 'rules', 'quotes', 'creditNotes', 'expenses', 'suppliers', 'meta'];
 
 /* Version du schéma de données (P0 fiabilisation).
    - 0 = bases antérieures à la v1.13 (aucun marqueur écrit).
@@ -13,9 +13,11 @@ const COLLECTIONS = ['settings', 'clients', 'invoices', 'transactions', 'rules',
      distincte) et séquence meta.creditSeq.
    - 4 = v1.26 : nouvelle collection « achats & dépenses » (expenses) et
      catégories de dépenses dans les paramètres.
+   - 5 = v1.27 : nouvelle collection « fournisseurs » (suppliers) et règlements
+     par dépense (expenses[].payments).
    Une base qui n'a pas de marqueur est considérée en version 0 puis migrée
    sans transformation tant qu'aucune évolution de structure n'est requise. */
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 
 /* Migrations : MIGRATIONS[v] = transformation pour passer de la version v à v+1.
    v1 → v2 (devis) : matérialise la collection quotes (nouvelle) et complète
@@ -23,7 +25,9 @@ const SCHEMA_VERSION = 4;
    v2 → v3 (avoir) : matérialise la collection creditNotes (nouvelle) et complète
    meta avec la séquence de numérotation des avoirs (creditSeq).
    v3 → v4 (dépenses) : matérialise la collection expenses (nouvelle) et les
-   catégories de dépenses dans les paramètres. */
+   catégories de dépenses dans les paramètres.
+   v4 → v5 (fournisseurs) : matérialise la collection suppliers (nouvelle) et
+   normalise chaque dépense (règlements payments + référence supplierId). */
 const MIGRATIONS = {
   1: (api) => {
     try {
@@ -50,6 +54,22 @@ const MIGRATIONS = {
       api.save('settings', api.read('settings'));
       /* expenses : nouvelle collection, matérialisée (vide). */
       api.save('expenses', api.read('expenses') || []);
+    } catch (e) { /* non bloquant : les défauts couvrent un échec de migration */ }
+  },
+  4: (api) => {
+    try {
+      /* suppliers : nouvelle collection, matérialisée (vide). */
+      api.save('suppliers', api.read('suppliers') || []);
+      /* expenses : normalisation — chaque dépense reçoit un historique de
+         règlements (tableau vide) et une référence fournisseur optionnelle. */
+      const list = api.read('expenses') || [];
+      if (Array.isArray(list)) {
+        for (const e of list) {
+          if (!Array.isArray(e.payments)) e.payments = [];
+          if (e.supplierId === undefined) e.supplierId = null;
+        }
+        api.save('expenses', list);
+      }
     } catch (e) { /* non bloquant : les défauts couvrent un échec de migration */ }
   }
 };
@@ -99,6 +119,7 @@ const DEFAULTS = {
   quotes: [],
   creditNotes: [],
   expenses: [],
+  suppliers: [],
   meta: { invoiceSeq: 0, quoteSeq: 0, creditSeq: 0 }
 };
 

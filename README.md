@@ -23,6 +23,8 @@ Trois modules complémentaires :
   +90 j), net des encaissements et des avoirs, avec **export CSV** ;
 - **Achats & dépenses** : saisie des achats et frais avec **fournisseur**, **catégorie** et **TVA
   déductible** ; les **débits** d'un relevé bancaire peuvent être **importés comme dépenses** ;
+- **Fournisseurs & paiements fournisseurs** : carnet de fournisseurs (coordonnées, identifiant
+  fiscal) et **règlements par achat** (acomptes/partiels) avec **reste à payer** ;
 - **Sauvegarde & restauration** de toute la base à l'**emplacement de votre choix** (fichier JSON).
 
 Et une **protection de l'application** (Paramètres → Sécurité), **version monoposte** : un **mot de
@@ -53,10 +55,31 @@ npm test
 
 ## Version
 
-La **version** s'affiche en bas de la barre latérale (ex. `v1.26`). À **chaque modification** du
+La **version** s'affiche en bas de la barre latérale (ex. `v1.27`). À **chaque modification** du
 projet, le champ `version` de `package.json` est incrémenté par la **partie mineure**
 (`1.0` → `1.1` → `1.2` …) et l'application affiche `major.minor`. Les noms d'installateurs
 reprennent la version complète (`1.26.0`).
+
+## v1.27 — Fournisseurs & paiements fournisseurs
+
+Nouveau module **fournisseurs** (le pendant « achats » des clients) :
+
+1. **Collection `suppliers` dédiée** (schéma de données **v5**, migration automatique) : nom,
+   e-mail, téléphone, **ICE / IF**, adresse et note.
+2. **Écran « Fournisseurs »** : création / modification / suppression, recherche, et par
+   fournisseur le **nombre d'achats**, le **total des achats** et le **reste à payer**.
+   La suppression d'un fournisseur **détache** ses achats (aucune dépense n'est supprimée).
+3. **Rattachement** : l'éditeur de dépense choisit le fournisseur dans la liste, avec création
+   rapide « ＋ Nouveau fournisseur » directement sur place.
+2. **Règlements par achat** : chaque achat a un **reste à payer** ; on enregistre des
+   **règlements** (acomptes/partiels), avec historique, modification et suppression — modèle
+   identique aux règlements de factures clients. Les **débits importés** sont réglés d'office.
+3. **Indicateurs** : dans « Achats & dépenses », colonnes **Payé / Reste / Statut** et indicateurs
+   **Total payé** et **Reste à payer (fournisseurs)** ; la liste des fournisseurs affiche le
+   **reste à payer** par fournisseur.
+4. **Schéma de données v5** : nouvelle collection `suppliers` et règlements par dépense
+   (`expenses[].payments`), migration automatique (les dépenses existantes sont normalisées).
+5. **Aide** : nouvelle vue « Fournisseurs » + articles bilingues (parité FR/AR testée).
 
 ## v1.26 — Achats & dépenses
 

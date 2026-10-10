@@ -67,7 +67,7 @@ test('schéma v1 → vN : migrations en chaîne (devis, avoirs puis dépenses)',
   const store = storeMod.createStore(dir);
   const v = store.migrate();
   assert.strictEqual(v, storeMod.SCHEMA_VERSION);
-  assert.strictEqual(storeMod.SCHEMA_VERSION, 4, 'schéma courant = v4');
+  assert.strictEqual(storeMod.SCHEMA_VERSION, 5, 'schéma courant = v5');
 
   /* Les collections quotes, creditNotes ET expenses existent (matérialisées), meta complet */
   const all = store.loadAll();
@@ -116,7 +116,7 @@ test('schéma v3 → v4 : migration « achats & dépenses » (collection expense
   fs.writeFileSync(path.join(dir, 'creditNotes.json'), JSON.stringify([{ id: 'av1', number: 'AV-2026-0001' }]), 'utf8');
 
   const store = storeMod.createStore(dir);
-  assert.strictEqual(store.migrate(), 4);
+  assert.strictEqual(store.migrate(), storeMod.SCHEMA_VERSION);
   const all = store.loadAll();
   assert.ok(Array.isArray(all.expenses));
   assert.strictEqual(all.expenses.length, 0);
@@ -126,4 +126,37 @@ test('schéma v3 → v4 : migration « achats & dépenses » (collection expense
   /* Les collections antérieures sont préservées. */
   assert.strictEqual(all.creditNotes[0].number, 'AV-2026-0001');
   assert.ok(fs.existsSync(path.join(dir, 'expenses.json')), 'expenses.json matérialisé');
+});
+
+test('schéma v4 → v5 : migration fournisseurs (collection suppliers + règlements dépenses)', () => {
+  const dir = tmpDir();
+  const v4 = { version: 4 };
+  fs.writeFileSync(path.join(dir, 'schema.json'), JSON.stringify(v4), 'utf8');
+  /* Dépenses préexistantes de la v1.26 : ni payments ni supplierId. */
+  fs.writeFileSync(path.join(dir, 'expenses.json'), JSON.stringify([
+    { id: 'e1', label: 'Loyer', amountTTC: 1000, tvaRate: 0 },
+    { id: 'e2', label: 'Fournitures', amountTTC: 120, tvaRate: 20 }
+  ]), 'utf8');
+
+  const store = storeMod.createStore(dir);
+  assert.strictEqual(store.migrate(), 5);
+  const all = store.loadAll();
+
+  /* Nouvelle collection fournisseurs, matérialisée (vide). */
+  assert.ok(Array.isArray(all.suppliers));
+  assert.strictEqual(all.suppliers.length, 0);
+  assert.ok(fs.existsSync(path.join(dir, 'suppliers.json')), 'suppliers.json matérialisé');
+
+  /* Chaque dépense est normalisée : règlements (tableau) + référence fournisseur. */
+  assert.strictEqual(all.expenses.length, 2);
+  for (const e of all.expenses) {
+    assert.ok(Array.isArray(e.payments));
+    assert.strictEqual(e.payments.length, 0);
+    assert.strictEqual(e.supplierId, null);
+  }
+  assert.strictEqual(all.expenses[0].label, 'Loyer');
+
+  /* Les migrations ne se rejouent pas. */
+  const reopened = storeMod.createStore(dir);
+  assert.strictEqual(reopened.migrate(), 5);
 });

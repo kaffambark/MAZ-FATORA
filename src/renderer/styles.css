@@ -587,6 +587,10 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-sp
 label { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; font-weight: 600; color: var(--text-soft); }
 label.wide { grid-column: 1 / -1; }
 label.check { flex-direction: row; align-items: center; gap: 8px; font-weight: 500; }
+/* Ajout rapide (fournisseur) : bloc repliable dans une grille de formulaire. */
+details.inline-add { grid-column: 1 / -1; border: 1px dashed var(--border-2); border-radius: var(--radius-sm); padding: 10px 12px; background: var(--panel); }
+details.inline-add > summary { cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--primary); }
+details.inline-add > summary::marker { color: var(--muted); }
 .logo-pick { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .logo-pick img {
   height: 56px;

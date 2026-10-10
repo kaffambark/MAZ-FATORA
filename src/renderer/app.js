@@ -10,6 +10,8 @@ const state = {
   rules: [],
   quotes: [],
   creditNotes: [],
+  expenses: [],
+  suppliers: [],
   meta: {}
 };
 
@@ -578,6 +580,7 @@ function renderAll() {
   renderExpenses();
   renderPayments();
   renderClients();
+  renderSuppliers();
   renderRules();
   renderSettings();
   renderDesignations();
@@ -1102,6 +1105,63 @@ function expenseCategories() {
 
 function expenseById(id) { return (state.expenses || []).find((e) => e.id === id) || null; }
 
+/* Règlements d'un achat (paiements fournisseurs) — même modèle que les
+   règlements de factures clients. */
+function expensePaymentList(e) {
+  return Array.isArray(e.payments) ? e.payments : [];
+}
+
+function expensePaid(e) {
+  return round2(expensePaymentList(e).reduce((s, p) => s + (Number(p.amount) || 0), 0));
+}
+
+function expenseRest(e) {
+  return round2(Math.max(0, (Number(e.amountTTC) || 0) - expensePaid(e)));
+}
+
+function expenseStatus(e) {
+  const r = expenseRest(e);
+  if (r <= 0.005) return 'paid';
+  return expensePaid(e) > 0 ? 'partial' : 'unpaid';
+}
+
+function expensePill(e) {
+  const st = expenseStatus(e);
+  const cls = st === 'paid' ? 'green' : (st === 'partial' ? 'amber' : 'red');
+  const label = st === 'paid' ? tr('exp.paid') : (st === 'partial' ? tr('exp.partial') : tr('exp.unpaid'));
+  return `<span class="pill ${cls}">${label}</span>`;
+}
+
+/* Fournisseurs nommés (annuaire), comme les clients. */
+function supplierById(id) { return (state.suppliers || []).find((s) => s.id === id) || null; }
+
+function supplierNameOf(e) {
+  if (!e) return '';
+  const s = e.supplierId ? supplierById(e.supplierId) : null;
+  return (s && s.name) || e.supplier || '';
+}
+
+function supplierStats(sid) {
+  const list = (state.expenses || []).filter((e) => e.supplierId === sid);
+  const total = round2(list.reduce((s, e) => s + (Number(e.amountTTC) || 0), 0));
+  const paid = round2(list.reduce((s, e) => s + expensePaid(e), 0));
+  return { count: list.length, total, paid, due: round2(Math.max(0, total - paid)) };
+}
+
+function collectExpenseStats() {
+  const list = state.expenses || [];
+  const total = round2(list.reduce((s, e) => s + (Number(e.amountTTC) || 0), 0));
+  const tva = round2(list.reduce((s, e) => s + expenseHtTva(e).tva, 0));
+  const paid = round2(list.reduce((s, e) => s + expensePaid(e), 0));
+  return {
+    total,
+    tva,
+    paid,
+    due: round2(list.reduce((s, e) => s + expenseRest(e), 0)),
+    nUnpaid: list.filter((e) => expenseStatus(e) !== 'paid').length
+  };
+}
+
 function renderExpenses() {
   const list = (state.expenses || []).slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
   const cats = expenseCategories();
@@ -1113,35 +1173,43 @@ function renderExpenses() {
     cats.map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
   sel.value = (cur !== 'all' && cats.indexOf(cur) !== -1) ? cur : 'all';
 
-  let total = 0, tvaTotal = 0;
-  for (const e of list) { const t = expenseHtTva(e); total += t.ttc; tvaTotal += t.tva; }
-  $('#exp-stat-total').textContent = money(round2(total));
-  $('#exp-stat-tva').textContent = money(round2(tvaTotal));
+  const stats = collectExpenseStats();
+  $('#exp-stat-total').textContent = money(stats.total);
+  $('#exp-stat-tva').textContent = money(stats.tva);
+  $('#exp-stat-paid').textContent = money(stats.paid);
+  $('#exp-stat-due').textContent = money(stats.due);
   $('#exp-stat-count').textContent = tr('exp.count', { n: list.length });
+  $('#exp-stat-due-sub').textContent = stats.nUnpaid ? tr('exp.nUnpaid', { n: stats.nUnpaid }) : '';
 
   const q = norm($('#exp-search').value);
   const f = $('#exp-filter').value;
   const view = list.filter((e) => {
     if (f !== 'all' && (e.category || '') !== f) return false;
-    if (q && !norm(`${e.label || ''} ${e.supplier || ''} ${e.reference || ''} ${e.category || ''}`).includes(q)) return false;
+    if (q && !norm(`${e.label || ''} ${supplierNameOf(e)} ${e.reference || ''} ${e.category || ''}`).includes(q)) return false;
     return true;
   });
 
   const rows = view.map((e) => {
     const t = expenseHtTva(e);
+    const paid = expensePaid(e);
+    const rest = expenseRest(e);
     const badge = e.source === 'import' ? ` <span class="pill blue">${tr('exp.sourceImport')}</span>` : '';
-    const sub = e.reference ? `<div class="muted small">${esc(tr('exp.ref', { r: e.reference }))}</div>` : '';
+    const ref = e.reference ? `<div class="muted small">${esc(tr('exp.ref', { r: e.reference }))}</div>` : '';
+    const sup = supplierNameOf(e);
     return `
     <tr>
       <td>${dateFR(e.date)}</td>
-      <td><strong>${esc(e.label || '—')}</strong>${badge}${sub}</td>
-      <td>${esc(e.supplier || '—')}</td>
+      <td><strong>${esc(e.label || '—')}</strong>${badge}${ref}</td>
+      <td>${sup ? esc(sup) : `<span class="muted">${esc(tr('exp.noSupplier'))}</span>`}</td>
       <td>${e.category ? esc(e.category) : `<span class="muted">${esc(tr('exp.noCategory'))}</span>`}</td>
       <td>${e.method ? esc(methodLabel(e.method)) : '—'}</td>
       <td class="num">${money(t.ttc)}</td>
-      <td class="num">${t.tva > 0 ? money(t.tva) : '—'}</td>
+      <td class="num">${paid > 0 ? money(paid) : '—'}</td>
+      <td class="num">${rest > 0 ? '<strong>' + money(rest) + '</strong>' : money(0)}</td>
+      <td>${expensePill(e)}</td>
       <td>
         <div class="row-actions">
+          <button class="btn small" data-action="pay-expense" data-id="${esc(e.id)}">${rest > 0 ? tr('exp.pay') : tr('exp.payList')}</button>
           <button class="btn small" data-action="edit-expense" data-id="${esc(e.id)}">${tr('common.edit')}</button>
           <button class="btn small danger" data-action="delete-expense" data-id="${esc(e.id)}">${tr('common.delete')}</button>
         </div>
@@ -1153,18 +1221,24 @@ function renderExpenses() {
     <thead><tr>
       <th>${tr('exp.hDate')}</th><th>${tr('exp.hLabel')}</th><th>${tr('exp.hSupplier')}</th>
       <th>${tr('exp.hCategory')}</th><th>${tr('exp.hMethod')}</th>
-      <th class="num">${tr('exp.hTTC')}</th><th class="num">${tr('exp.hTva')}</th><th></th>
+      <th class="num">${tr('exp.hTTC')}</th><th class="num">${tr('exp.hPaid')}</th>
+      <th class="num">${tr('exp.hDue')}</th><th>${tr('exp.hStatus')}</th><th></th>
     </tr></thead>
-    <tbody>${rows || `<tr><td colspan="8" class="empty">${tr('exp.empty')}</td></tr>`}</tbody>`;
+    <tbody>${rows || `<tr><td colspan="10" class="empty">${tr('exp.empty')}</td></tr>`}</tbody>`;
 }
 
 function openExpenseEditor(id) {
   const e = id ? state.expenses.find((x) => x.id === id) : null;
+  const isNew = !e;
   const cats = expenseCategories();
   const catOptions = cats.map((c) => `<option value="${esc(c)}"></option>`).join('');
   const today = todayISO();
   const t = e ? expenseHtTva(e) : { ttc: 0 };
   const tvaVal = e && e.tvaRate !== undefined && e.tvaRate !== null ? e.tvaRate : (state.settings.defaultExpenseTva || 0);
+  const supplierOptions = `<option value="">${tr('sup.none')}</option>` +
+    state.suppliers.map((s) => `<option value="${s.id}" ${e && e.supplierId === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
+  /* Dépense créée avant l'annuaire : fournisseur en texte libre uniquement. */
+  const legacySup = e && e.supplier && !e.supplierId;
 
   openModal(`
     <h2>${e ? tr('exp.edit') : tr('exp.new')}</h2>
@@ -1172,7 +1246,17 @@ function openExpenseEditor(id) {
       <label>${tr('exp.formDate')} <input type="date" id="ex-date" value="${esc(e ? (e.date || '') : today)}"></label>
       <label>${tr('exp.formAmount')} <input type="number" id="ex-amount" step="0.01" min="0" value="${esc(e ? t.ttc : '')}"></label>
       <label class="wide">${tr('exp.formLabel')} <input type="text" id="ex-label" value="${esc(e ? (e.label || '') : '')}"></label>
-      <label>${tr('exp.formSupplier')} <input type="text" id="ex-supplier" value="${esc(e ? (e.supplier || '') : '')}"></label>
+      <label>${tr('exp.formSupplier')}
+        <select id="ex-supplier">${supplierOptions}${legacySup ? `<option value="__keep__" selected>${esc(e.supplier)}</option>` : ''}</select>
+      </label>
+      <details class="inline-add wide" id="ex-supplier-new">
+        <summary>${tr('sup.addNew')}</summary>
+        <div class="form-grid" style="margin-top:8px">
+          <label>${tr('sup.formName')} <input type="text" id="ex-newsup-name"></label>
+          <label>${tr('sup.formPhone')} <input type="text" id="ex-newsup-phone"></label>
+          <label class="wide">${tr('sup.formAddress')} <input type="text" id="ex-newsup-address"></label>
+        </div>
+      </details>
       <label>${tr('exp.formCategory')}
         <input type="text" id="ex-category" list="ex-cats" value="${esc(e ? (e.category || '') : '')}">
         <datalist id="ex-cats">${catOptions}</datalist>
@@ -1184,12 +1268,14 @@ function openExpenseEditor(id) {
       <label class="wide">${tr('exp.formRef')} <input type="text" id="ex-ref" value="${esc(e ? (e.reference || '') : '')}"></label>
       <label class="wide">${tr('exp.formNote')} <input type="text" id="ex-note" value="${esc(e ? (e.note || '') : '')}"></label>
     </div>
+    ${isNew ? `<label class="check" style="margin-top:6px"><input type="checkbox" id="ex-paid" checked> <span>${tr('exp.formPaid')}</span></label><p class="hint" style="margin:4px 0 0">${tr('exp.formPaidHint')}</p>` : ''}
     <div class="modal-actions">
       <button class="btn" id="ex-cancel">${tr('common.cancel')}</button>
       <button class="btn primary" id="ex-save">${tr('common.save')}</button>
     </div>`);
 
   $('#ex-cancel').addEventListener('click', closeModal);
+
   $('#ex-save').addEventListener('click', async () => {
     const label = $('#ex-label').value.trim();
     const amount = Number($('#ex-amount').value);
@@ -1197,10 +1283,39 @@ function openExpenseEditor(id) {
     if (isNaN(amount) || amount <= 0) { toast(tr('exp.needAmount'), 'error'); return; }
     const category = $('#ex-category').value.trim();
     const tvaInput = Number($('#ex-tva').value);
+    /* fournisseur : nouveau créé sur place, référence de l'annuaire, ou
+       texte libre hérité d'une dépense créée avant l'annuaire. */
+    const supVal = $('#ex-supplier').value;
+    let supplierId = null, supplier = '';
+    const newSupEl = $('#ex-newsup-name');
+    const newSupName = newSupEl ? newSupEl.value.trim() : '';
+    if (newSupName) {
+      const ns = {
+        id: uid(),
+        createdAt: new Date().toISOString(),
+        name: newSupName,
+        email: '',
+        phone: ($('#ex-newsup-phone') ? $('#ex-newsup-phone').value.trim() : ''),
+        tvaNumber: '',
+        address: ($('#ex-newsup-address') ? $('#ex-newsup-address').value.trim() : ''),
+        note: ''
+      };
+      state.suppliers.push(ns);
+      await persist('suppliers');
+      supplierId = ns.id;
+      supplier = ns.name;
+    } else if (supVal === '__keep__') {
+      supplier = (e && e.supplier) || '';
+    } else if (supVal) {
+      const s = supplierById(supVal);
+      supplierId = s ? s.id : null;
+      supplier = s ? s.name : '';
+    }
     const data = {
       date: $('#ex-date').value || todayISO(),
       label,
-      supplier: $('#ex-supplier').value.trim(),
+      supplierId,
+      supplier,
       category,
       amountTTC: round2(amount),
       tvaRate: isNaN(tvaInput) ? 0 : tvaInput,
@@ -1208,8 +1323,24 @@ function openExpenseEditor(id) {
       reference: $('#ex-ref').value.trim(),
       note: $('#ex-note').value.trim()
     };
-    if (e) Object.assign(e, data);
-    else state.expenses.push({ id: uid(), source: 'manual', createdAt: new Date().toISOString(), ...data });
+    if (e) {
+      Object.assign(e, data);
+    } else {
+      const rec = { id: uid(), source: 'manual', createdAt: new Date().toISOString(), ...data, payments: [] };
+      /* « payée » : un règlement immédiat du montant total (modèle identique
+         aux règlements de factures clients). Décochée → dette fournisseur. */
+      if ($('#ex-paid') && $('#ex-paid').checked) {
+        rec.payments = [{
+          id: uid(),
+          date: data.date,
+          amount: data.amountTTC,
+          method: data.method || 'other',
+          reference: data.reference,
+          note: ''
+        }];
+      }
+      state.expenses.push(rec);
+    }
     /* nouvelle catégorie saisie : mémorisée pour les prochaines dépenses */
     if (category && (state.settings.expenseCategories || []).indexOf(category) === -1) {
       state.settings.expenseCategories = expenseCategories();
@@ -1232,17 +1363,174 @@ async function deleteExpense(id) {
   toast(tr('exp.deleted'));
 }
 
+/* ---------------- Règlements fournisseurs (par achat) ---------------- */
+
+function expensePaymentHistoryHTML(e) {
+  const recs = expensePaymentList(e);
+  if (!recs.length) {
+    const legacy = e.paid ? `<div class="hint" style="margin-top:8px">${tr('exp.payLegacy')}</div>` : '';
+    return `<div class="empty">${tr('exp.payNone')}</div>${legacy}`;
+  }
+  return recs.slice()
+    .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
+    .map((p) => `
+    <div class="list-item">
+      <div>
+        <div class="li-main">${money(p.amount)} · ${dateFR(p.date)} · ${esc(methodLabel(p.method))}</div>
+        <div class="li-sub">${[p.reference, p.note].filter(Boolean).map(esc).join(' · ') || '—'}</div>
+      </div>
+      <div class="row">
+        <button class="btn small" data-action="exp-pay-edit" data-id="${esc(e.id)}" data-pay="${esc(p.id)}" title="${tr('exp.payEditTitle')}">✎</button>
+        <button class="btn small danger" data-action="exp-pay-delete" data-id="${esc(e.id)}" data-pay="${esc(p.id)}" title="${tr('common.delete')}">✕</button>
+      </div>
+    </div>`).join('');
+}
+
+function openExpensePaymentModal(id) {
+  const e = expenseById(id);
+  if (!e) { toast(tr('common.notFound'), 'error'); return; }
+
+  const total = round2(Number(e.amountTTC) || 0);
+  const paid = expensePaid(e);
+  const rest = expenseRest(e);
+  const methodOptions = METHODS.map((m) => `<option value="${m}">${esc(methodLabel(m))}</option>`).join('');
+
+  openModal(`
+    <h2>${tr('exp.payTitle')}</h2>
+    <p class="modal-sub">${esc(tr('exp.payFor', { label: e.label || '', supplier: supplierNameOf(e) || tr('exp.noSupplier') }))} · ${esc(tr('exp.payRest', { v: money(rest) }))}</p>
+
+    <div class="import-summary">
+      <div class="is-item"><span class="is-value">${money(total)}</span><span class="is-label">${tr('pay.hTotal')}</span></div>
+      <div class="is-item"><span class="is-value">${money(paid)}</span><span class="is-label">${tr('pay.hPaid')}</span></div>
+      <div class="is-item"><span class="is-value">${money(rest)}</span><span class="is-label">${tr('pay.hRest')}</span></div>
+    </div>
+
+    ${rest > 0 ? `
+    <div class="form-grid" style="margin-top:14px">
+      <label>${tr('exp.amount')} <input type="number" id="expay-amount" step="0.01" min="0" value="${rest.toFixed(2)}"></label>
+      <label>${tr('exp.payDate')} <input type="date" id="expay-date" value="${todayISO()}"></label>
+      <label>${tr('exp.payMethod')} <select id="expay-method">${methodOptions}</select></label>
+      <label class="wide">${tr('exp.payRef')} <input type="text" id="expay-ref" placeholder="CHQ 123456 / VIR 789"></label>
+      <label class="wide">${tr('exp.payNote')} <input type="text" id="expay-note"></label>
+    </div>` : `<p class="hint" style="margin-top:14px">${tr('exp.paySettled')}</p>`}
+
+    <div class="modal-section">
+      <h3>${tr('exp.payList')}</h3>
+      <div class="list" id="expay-history">${expensePaymentHistoryHTML(e)}</div>
+    </div>
+
+    <div class="modal-actions">
+      ${rest > 0 ? `
+      <button class="btn" id="expay-cancel">${tr('common.cancel')}</button>
+      <button class="btn" id="expay-all">${tr('exp.payAll')}</button>
+      <button class="btn success" id="expay-save">${tr('exp.paySave')}</button>` : `
+      <button class="btn" id="expay-cancel">${tr('common.close')}</button>`}
+    </div>`);
+
+  $('#expay-cancel').addEventListener('click', closeModal);
+
+  if ($('#expay-all')) {
+    $('#expay-all').addEventListener('click', () => { $('#expay-amount').value = rest.toFixed(2); });
+  }
+
+  if ($('#expay-save')) {
+    $('#expay-save').addEventListener('click', async () => {
+      const amount = round2(Number($('#expay-amount').value));
+      if (!(amount > 0)) { toast(tr('exp.payErrAmount'), 'error'); return; }
+      if (amount > rest + 0.005) { toast(tr('exp.payErrOver', { v: money(amount), r: money(rest) }), 'error'); return; }
+
+      e.payments = expensePaymentList(e).concat([{
+        id: uid(),
+        date: $('#expay-date').value || todayISO(),
+        amount,
+        method: $('#expay-method').value || 'other',
+        reference: $('#expay-ref').value.trim(),
+        note: $('#expay-note').value.trim()
+      }]);
+
+      await persist('expenses');
+      renderAll();
+      closeModal();
+      toast(tr('exp.payDone', { v: money(amount) }), 'success');
+    });
+  }
+}
+
+function openEditExpensePaymentModal(eid, payId) {
+  const e = expenseById(eid);
+  if (!e) { toast(tr('common.notFound'), 'error'); return; }
+  const rec = expensePaymentList(e).find((p) => p.id === payId);
+  if (!rec) { toast(tr('common.notFound'), 'error'); return; }
+
+  const rest = expenseRest(e);
+  const maxAmount = round2(rest + Number(rec.amount || 0));
+  const methodOptions = METHODS.map((m) =>
+    `<option value="${m}"${m === rec.method ? ' selected' : ''}>${esc(methodLabel(m))}</option>`).join('');
+
+  openModal(`
+    <h2>${tr('exp.payEditTitle')}</h2>
+    <p class="modal-sub">${esc(tr('exp.payFor', { label: e.label || '', supplier: supplierNameOf(e) || tr('exp.noSupplier') }))}</p>
+    <div class="form-grid" style="margin-top:14px">
+      <label>${tr('exp.amount')} <input type="number" id="expay-amount" step="0.01" min="0" value="${Number(rec.amount).toFixed(2)}"></label>
+      <label>${tr('exp.payDate')} <input type="date" id="expay-date" value="${esc(rec.date || todayISO())}"></label>
+      <label>${tr('exp.payMethod')} <select id="expay-method">${methodOptions}</select></label>
+      <label class="wide">${tr('exp.payRef')} <input type="text" id="expay-ref" value="${esc(rec.reference || '')}"></label>
+      <label class="wide">${tr('exp.payNote')} <input type="text" id="expay-note" value="${esc(rec.note || '')}"></label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" id="expay-cancel">${tr('common.cancel')}</button>
+      <button class="btn success" id="expay-save">${tr('common.save')}</button>
+    </div>`);
+
+  $('#expay-cancel').addEventListener('click', () => openExpensePaymentModal(eid));
+  $('#expay-save').addEventListener('click', async () => {
+    const amount = round2(Number($('#expay-amount').value));
+    if (!(amount > 0)) { toast(tr('exp.payErrAmount'), 'error'); return; }
+    if (amount > maxAmount + 0.005) { toast(tr('exp.payErrOver', { v: money(amount), r: money(maxAmount) }), 'error'); return; }
+
+    rec.date = $('#expay-date').value || todayISO();
+    rec.amount = amount;
+    rec.method = $('#expay-method').value || 'other';
+    rec.reference = $('#expay-ref').value.trim();
+    rec.note = $('#expay-note').value.trim();
+
+    await persist('expenses');
+    renderAll();
+    openExpensePaymentModal(eid);
+    toast(tr('exp.payEdited'), 'success');
+  });
+}
+
+async function deleteExpensePayment(eid, payId) {
+  const e = expenseById(eid);
+  if (!e) return;
+  const rec = expensePaymentList(e).find((p) => p.id === payId);
+  if (!rec) return;
+  const ok = await confirmBox(tr('exp.payDeleteConfirm', { v: money(rec.amount), d: dateFR(rec.date) }), {
+    okLabel: tr('common.delete'),
+    okClass: 'danger'
+  });
+  if (!ok) return;
+
+  e.payments = expensePaymentList(e).filter((p) => p.id !== payId);
+  await persist('expenses');
+  renderAll();
+  toast(tr('exp.payDeleted'));
+  openExpensePaymentModal(eid);
+}
+
 function expensesCsvText() {
   const esc = (v) => {
     const s = String(v === null || v === undefined ? '' : v);
     return /[";\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
   };
   const list = (state.expenses || []).slice().sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
-  const head = [tr('exp.hDate'), tr('exp.hLabel'), tr('exp.hSupplier'), tr('exp.hCategory'), tr('exp.hMethod'), tr('exp.hHT'), tr('exp.hTva'), tr('exp.hTTC'), tr('exp.formRef')];
+  const stLabel = (e) => tr(expenseStatus(e) === 'paid' ? 'exp.paid' : (expenseStatus(e) === 'partial' ? 'exp.partial' : 'exp.unpaid'));
+  const head = [tr('exp.hDate'), tr('exp.hLabel'), tr('exp.hSupplier'), tr('exp.hCategory'), tr('exp.hMethod'), tr('exp.hHT'), tr('exp.hTva'), tr('exp.hTTC'), tr('exp.hPaid'), tr('exp.hDue'), tr('exp.hStatus'), tr('exp.formRef')];
   const out = [head];
   for (const e of list) {
     const t = expenseHtTva(e);
-    out.push([e.date || '', e.label || '', e.supplier || '', e.category || '', e.method ? methodLabel(e.method) : '', t.ht.toFixed(2), t.tva.toFixed(2), t.ttc.toFixed(2), e.reference || '']);
+    out.push([e.date || '', e.label || '', supplierNameOf(e) || '', e.category || '', e.method ? methodLabel(e.method) : '', t.ht.toFixed(2), t.tva.toFixed(2), t.ttc.toFixed(2), expensePaid(e).toFixed(2), expenseRest(e).toFixed(2), stLabel(e), e.reference || '']);
   }
   return '\uFEFF' + out.map((r) => r.map(esc).join(';')).join('\r\n');
 }
@@ -1327,6 +1615,100 @@ function renderClients() {
   $('#client-table').innerHTML = `
     <thead><tr><th>${tr('cl.hName')}</th><th>${tr('cl.hEmail')}</th><th>${tr('cl.hAddress')}</th><th>${tr('cl.hTva')}</th><th class="num">${tr('cl.hCount')}</th><th></th></tr></thead>
     <tbody>${rows || `<tr><td colspan="6" class="empty">${tr('cl.empty')}</td></tr>`}</tbody>`;
+}
+
+/* ---------------- Fournisseurs (annuaire) ---------------- */
+
+function renderSuppliers() {
+  const q = norm($('#sup-search').value);
+  const all = state.suppliers || [];
+  const list = q
+    ? all.filter((s) => norm(`${s.name || ''} ${s.email || ''} ${s.phone || ''} ${s.tvaNumber || ''} ${s.address || ''}`).includes(q))
+    : all;
+
+  let totTotal = 0, totDue = 0;
+  for (const s of all) { const st = supplierStats(s.id); totTotal += st.total; totDue += st.due; }
+  $('#sup-stat-count').textContent = String(all.length);
+  $('#sup-stat-total').textContent = money(round2(totTotal));
+  $('#sup-stat-due').textContent = money(round2(totDue));
+
+  const rows = list.map((s) => {
+    const st = supplierStats(s.id);
+    return `
+      <tr>
+        <td><strong>${esc(s.name)}</strong></td>
+        <td>${esc(s.email || '—')}</td>
+        <td>${esc(s.phone || '—')}</td>
+        <td>${esc(s.tvaNumber || '—')}</td>
+        <td class="num">${st.count}</td>
+        <td class="num">${money(st.total)}</td>
+        <td class="num">${st.due > 0 ? '<strong>' + money(st.due) + '</strong>' : money(0)}</td>
+        <td>
+          <div class="row-actions">
+            <button class="btn small" data-action="edit-supplier" data-id="${esc(s.id)}">${tr('common.edit')}</button>
+            <button class="btn small danger" data-action="delete-supplier" data-id="${esc(s.id)}">${tr('common.delete')}</button>
+          </div>
+        </td>
+      </tr>`;
+  }).join('');
+
+  $('#supplier-table').innerHTML = `
+    <thead><tr><th>${tr('sup.hName')}</th><th>${tr('sup.hEmail')}</th><th>${tr('sup.hPhone')}</th><th>${tr('sup.hTva')}</th><th class="num">${tr('sup.hCount')}</th><th class="num">${tr('sup.hTotal')}</th><th class="num">${tr('sup.hDue')}</th><th></th></tr></thead>
+    <tbody>${rows || `<tr><td colspan="8" class="empty">${tr('sup.empty')}</td></tr>`}</tbody>`;
+}
+
+function openSupplierEditor(id) {
+  const s = id ? state.suppliers.find((x) => x.id === id) : null;
+  openModal(`
+    <h2>${s ? tr('sup.edit') : tr('sup.create')}</h2>
+    <div class="form-grid" style="margin-top:14px">
+      <label>${tr('sup.formName')} <input type="text" id="sup-name" value="${esc(s ? s.name : '')}"></label>
+      <label>${tr('sup.formEmail')} <input type="email" id="sup-email" value="${esc(s ? s.email : '')}"></label>
+      <label>${tr('sup.formPhone')} <input type="text" id="sup-phone" value="${esc(s ? s.phone : '')}"></label>
+      <label>${tr('sup.formTva')} <input type="text" id="sup-tva" value="${esc(s ? s.tvaNumber : '')}"></label>
+      <label class="wide">${tr('sup.formAddress')} <input type="text" id="sup-address" value="${esc(s ? s.address : '')}"></label>
+      <label class="wide">${tr('sup.formNote')} <input type="text" id="sup-note" value="${esc(s ? s.note : '')}"></label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" id="sup-cancel">${tr('common.cancel')}</button>
+      <button class="btn primary" id="sup-save">${tr('common.save')}</button>
+    </div>`);
+
+  $('#sup-cancel').addEventListener('click', closeModal);
+  $('#sup-save').addEventListener('click', async () => {
+    const name = $('#sup-name').value.trim();
+    if (!name) { toast(tr('sup.nameRequired'), 'error'); return; }
+    const data = {
+      name,
+      email: $('#sup-email').value.trim(),
+      phone: $('#sup-phone').value.trim(),
+      tvaNumber: $('#sup-tva').value.trim(),
+      address: $('#sup-address').value.trim(),
+      note: $('#sup-note').value.trim()
+    };
+    if (s) Object.assign(s, data);
+    else state.suppliers.push({ id: uid(), createdAt: new Date().toISOString(), ...data });
+    await persist('suppliers');
+    renderAll();
+    closeModal();
+    toast(tr('sup.saved'), 'success');
+  });
+}
+
+async function deleteSupplier(id) {
+  const s = state.suppliers.find((x) => x.id === id);
+  if (!s) return;
+  const n = (state.expenses || []).filter((e) => e.supplierId === id).length;
+  const warn = n ? tr('sup.delKeep', { n }) : '';
+  if (!(await confirmBox(tr('sup.delConfirm', { name: s.name }) + warn, { okLabel: tr('common.delete'), okClass: 'danger' }))) return;
+  /* On détache les achats concernés (le texte du fournisseur est conservé). */
+  for (const e of (state.expenses || [])) {
+    if (e.supplierId === id) { e.supplierId = null; if (!e.supplier) e.supplier = s.name; }
+  }
+  state.suppliers = state.suppliers.filter((x) => x.id !== id);
+  await persist('suppliers', 'expenses');
+  renderAll();
+  toast(tr('sup.deleted'));
 }
 
 function renderRules() {
@@ -3044,20 +3426,32 @@ async function doImport() {
       const k = importKey(e);
       if (dedupe && existingExp.has(k)) continue;
       existingExp.add(k);
+      const amountTTC = round2(Math.abs(e.amount));
       state.expenses.push({
         id: uid(),
         date: e.date || '',
         label: e.label || '',
+        supplierId: null,
         supplier: '',
         category: '',
-        amountTTC: round2(Math.abs(e.amount)),
+        amountTTC,
         tvaRate: Number(state.settings.defaultExpenseTva) || 0,
-        method: '',
+        method: 'transfer',
         reference: '',
         note: '',
         source: 'import',
         importKey: k,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        /* Un débit bancaire est un paiement déjà effectué : la dépense est
+           réglée d'emblée (aucune dette fournisseur). */
+        payments: [{
+          id: uid(),
+          date: e.date || '',
+          amount: amountTTC,
+          method: 'transfer',
+          reference: '',
+          note: ''
+        }]
       });
       expensesAdded++;
     }
@@ -3261,6 +3655,7 @@ function applyBackupData(data) {
   state.quotes = (data && data.quotes) || [];
   state.creditNotes = (data && data.creditNotes) || [];
   state.expenses = (data && data.expenses) || [];
+  state.suppliers = (data && data.suppliers) || [];
   state.meta = (data && (data.meta && (data.meta.invoiceSeq !== undefined || data.meta.quoteSeq !== undefined || data.meta.creditSeq !== undefined))) ? data.meta : { invoiceSeq: 0, quoteSeq: 0, creditSeq: 0 };
   if (typeof I18N !== 'undefined') I18N.setLang(state.settings.language || 'fr');
   syncLangButtons();
@@ -3728,6 +4123,11 @@ document.addEventListener('click', async (e) => {
     case 'new-credit-from-invoice': openCreditEditor(null, id); break;
     case 'edit-expense': openExpenseEditor(id); break;
     case 'delete-expense': await deleteExpense(id); break;
+    case 'pay-expense': openExpensePaymentModal(id); break;
+    case 'exp-pay-edit': openEditExpensePaymentModal(id, el.dataset.pay); break;
+    case 'exp-pay-delete': await deleteExpensePayment(id, el.dataset.pay); break;
+    case 'edit-supplier': openSupplierEditor(id); break;
+    case 'delete-supplier': await deleteSupplier(id); break;
     case 'pay-invoice': openPaymentModal(id); break;
     case 'pay-edit': openEditPaymentModal(id, el.dataset.pay); break;
     case 'pay-delete': await deletePayment(id, el.dataset.pay); break;
@@ -3836,6 +4236,8 @@ $('#exp-filter').addEventListener('change', renderExpenses);
 $('#btn-export-expenses').addEventListener('click', exportExpensesCsv);
 $('#btn-new-expense').addEventListener('click', () => { showView('expenses'); openExpenseEditor(null); });
 $('#btn-new-client').addEventListener('click', () => openClientEditor(null));
+$('#sup-search').addEventListener('input', renderSuppliers);
+$('#btn-new-supplier').addEventListener('click', () => openSupplierEditor(null));
 $('#btn-new-rule').addEventListener('click', () => openRuleEditor(null));
 
 $$('.lang-btn').forEach((b) => b.addEventListener('click', () => setLanguage(b.dataset.lang)));
@@ -4312,6 +4714,7 @@ async function loadAppData() {
     state.quotes = data.quotes || [];
     state.creditNotes = data.creditNotes || [];
     state.expenses = data.expenses || [];
+    state.suppliers = data.suppliers || [];
     state.meta = data.meta || { invoiceSeq: 0, quoteSeq: 0, creditSeq: 0 };
     /* Réparation : factures enregistrées sans identifiant (bug antérieur) —
        sans id, l'éditeur se rouvrait vide et « Régler » ne trouvait pas la facture. */

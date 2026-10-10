@@ -25,7 +25,7 @@
 
 (function (root) {
   /* Écrans de l'application (ancrage de l'aide contextuelle). */
-  const SCREENS = ['dashboard', 'import', 'transactions', 'drafts', 'invoices', 'quotes', 'credits', 'balance', 'expenses', 'payments', 'clients', 'rules', 'settings'];
+  const SCREENS = ['dashboard', 'import', 'transactions', 'drafts', 'invoices', 'quotes', 'credits', 'balance', 'expenses', 'suppliers', 'payments', 'clients', 'rules', 'settings'];
 
   const CATEGORIES = [
     { id: 'start', title: { fr: 'Démarrage', ar: 'البدء' }, icon: 'i-dash' },
@@ -453,15 +453,53 @@
         fr: [
           'Le montant saisi est TTC : le HT et la TVA en sont calculés automatiquement.',
           'La TVA déductible s’ajoute à la TVA collectée de vos ventes pour votre déclaration.',
+          'Chaque achat a un bouton « Régler » pour enregistrer les paiements au fournisseur et suivre le reste à payer.',
           'Exportez la liste en CSV pour votre comptable.'
         ],
         ar: [
           'المبلغ المُدخل شامل الضريبة: يُحسب المبلغ دون ضريبة والضريبة تلقائيًا.',
           'تُضاف الضريبة القابلة للخصم إلى الضريبة المحصلة من مبيعاتك لإعداد التصريح.',
+          'لكل عملية شراء زر «تسديد» لتسجيل المدفوعات للمورد ومتابعة المتبقي.',
           'صدّر القائمة بصيغة CSV لمحاسبك.'
         ]
       },
-      related: ['screen.import', 'screen.dashboard', 'screen.settings']
+      related: ['screen.import', 'screen.suppliers', 'screen.dashboard', 'screen.settings']
+    },
+
+    'screen.suppliers': {
+      category: 'screen', screen: 'suppliers', priority: 1,
+      title: { fr: 'Les fournisseurs', ar: 'الموردون' },
+      goal: {
+        fr: "Gérer votre carnet de fournisseurs et suivre ce que vous leur devez.",
+        ar: 'إدارة دفتر الموردين ومتابعة ما هو مستحق لهم.'
+      },
+      steps: {
+        fr: [
+          'Ouvrez « Fournisseurs ».',
+          'Cliquez sur « Nouveau fournisseur » et renseignez son nom, ses coordonnées et son identifiant fiscal.',
+          'Rattachez un achat à un fournisseur depuis l’éditeur de dépense.',
+          'La liste affiche, par fournisseur, le nombre d’achats, le total et le reste à payer.'
+        ],
+        ar: [
+          'افتح «الموردون».',
+          'اضغط على «مورد جديد» واملأ الاسم وبيانات الاتصال والمعرّف الجبائي.',
+          'اربط عملية شراء بمورد من محرّر المصروف.',
+          'تُظهر القائمة لكل مورد عدد المشتريات والمجموع والمتبقي.'
+        ]
+      },
+      tips: {
+        fr: [
+          'Dans l’éditeur de dépense, choisissez le fournisseur dans la liste ou ouvrez « ＋ Nouveau fournisseur » pour le créer sur place.',
+          'Le règlement d’un achat se fait dans « Achats & dépenses » (bouton « Régler »).',
+          'Supprimer un fournisseur ne supprime pas ses achats : ils sont simplement détachés.'
+        ],
+        ar: [
+          'في محرّر المصروف، اختر المورد من القائمة أو افتح «＋ مورد جديد» لإنشائه فورًا.',
+          'تسديد عملية الشراء يتم من «المشتريات والمصاريف» (زر «تسديد»).',
+          'حذف المورد لا يحذف مشترياته: تُفصل فقط.'
+        ]
+      },
+      related: ['screen.expenses', 'screen.dashboard', 'screen.settings']
     },
 
     'screen.payments': {

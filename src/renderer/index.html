@@ -20,6 +20,7 @@
       <symbol id="i-invoices" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></symbol>
       <symbol id="i-payments" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></symbol>
       <symbol id="i-clients" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+      <symbol id="i-supplier" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l1.2-5h15.6L21 9"/><path d="M4 9v10a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9"/><path d="M9 20v-6h6v6"/><path d="M3 9h18"/></symbol>
       <symbol id="i-rules" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></symbol>
       <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
       <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></symbol>
@@ -87,6 +88,9 @@
         </button>
         <button class="nav-item" data-view="clients">
           <svg class="ic"><use href="#i-clients"/></svg><span class="nav-label" data-i18n="nav.clients">Clients</span>
+        </button>
+        <button class="nav-item" data-view="suppliers">
+          <svg class="ic"><use href="#i-supplier"/></svg><span class="nav-label" data-i18n="nav.suppliers">Fournisseurs</span>
         </button>
         <button class="nav-item" data-view="rules">
           <svg class="ic"><use href="#i-rules"/></svg><span class="nav-label" data-i18n="nav.rules">Règles automatiques</span>
@@ -518,6 +522,16 @@
             <span class="stat-value money" id="exp-stat-tva">0,00 MAD</span>
             <span class="stat-sub"></span>
           </div>
+          <div class="stat card">
+            <span class="stat-label" data-i18n="exp.totalPaid">Total payé</span>
+            <span class="stat-value money" id="exp-stat-paid">0,00 MAD</span>
+            <span class="stat-sub"></span>
+          </div>
+          <div class="stat card">
+            <span class="stat-label" data-i18n="exp.totalDue">Reste à payer (fournisseurs)</span>
+            <span class="stat-value money" id="exp-stat-due">0,00 MAD</span>
+            <span class="stat-sub" id="exp-stat-due-sub"></span>
+          </div>
         </div>
 
         <div class="card">
@@ -588,6 +602,30 @@
         <div class="card">
           <div class="table-wrap">
             <table id="client-table"></table>
+          </div>
+        </div>
+      </section>
+
+      <!-- FOURNISSEURS -->
+      <section id="view-suppliers" class="view">
+        <header class="view-header">
+          <h1 data-i18n="sup.title">Fournisseurs</h1>
+          <div class="actions">
+            <input type="search" id="sup-search" data-i18n-ph="sup.search" placeholder="Rechercher un fournisseur…">
+            <button class="btn primary" id="btn-new-supplier">
+              <svg class="ic"><use href="#i-plus"/></svg><span data-i18n="sup.new">Nouveau fournisseur</span>
+            </button>
+          </div>
+        </header>
+        <div class="import-summary">
+          <div class="is-item"><span class="is-value" id="sup-stat-count">0</span><span class="is-label" data-i18n="nav.suppliers">Fournisseurs</span></div>
+          <div class="is-item"><span class="is-value" id="sup-stat-total">0,00 MAD</span><span class="is-label" data-i18n="sup.statTotal">Total achats (TTC)</span></div>
+          <div class="is-item"><span class="is-value" id="sup-stat-due">0,00 MAD</span><span class="is-label" data-i18n="sup.statDue">Reste à payer</span></div>
+        </div>
+        <p class="hint" data-i18n="sup.hint">Gérez vos fournisseurs : coordonnées, identifiants fiscaux, total des achats et reste à payer.</p>
+        <div class="card">
+          <div class="table-wrap">
+            <table id="supplier-table"></table>
           </div>
         </div>
       </section>

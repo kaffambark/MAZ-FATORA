@@ -1,6 +1,6 @@
 # Plan — Avoirs, balance âgée, achats & dépenses
 
-Statut : **en cours de réalisation** (v1.24 → v1.26).
+Statut : **en cours de réalisation** (v1.24 → v1.27).
 Principes : tout est **hors ligne**, **bilingue FR/AR à parité testée**, les données
 restent des collections JSON avec **migrations de schéma**, et le **rendu des
 documents reste un moteur unique** (`print-doc.js`).
@@ -125,4 +125,35 @@ Hors périmètre immédiat (plus tard) : factures fournisseurs avec lignes &
 
 ## 6. Ordre et dépendances
 
-`v1.24 Avoir` → `v1.25 Balance âgée` (intègre les avoirs) → `v1.26 Achats & dépenses`.
+`v1.24 Avoir` → `v1.25 Balance âgée` (intègre les avoirs) → `v1.26 Achats & dépenses`
+→ **v1.27 Fournisseurs & paiements fournisseurs**.
+
+### v1.27 — Fournisseurs & paiements fournisseurs
+Décisions validées : **règlements par achat** (comme les factures clients) et
+**écran « Fournisseurs » séparé** (comme « Clients »).
+
+- `store.js` : collection **`suppliers`** (nom, contact, ICE/IF, adresse),
+  normalisation de `expenses` (`payments: []`, `supplierId`), migration **v4 → v5**.
+- `backup.js` : ajout de `suppliers` à la sauvegarde/restauration.
+- **Modèle dépense étendu** : `supplierId` (référence optionnelle à un fournisseur),
+  `payments: [{id, date, amount, method, reference, note}]`. Reste à payer =
+  `amountTTC − Σ règlements`. Une dépense importée d'un débit de relevé est **réglée
+  d'office** (un règlement = montant TTC) ; une dépense saisie est « à payer » par
+  défaut (sauf case « déjà payée »).
+- **Vue « Fournisseurs »** : créer / modifier / supprimer un fournisseur (nom,
+  contact, ICE/IF, coordonnées), total achats et **reste à payer** par fournisseur.
+  La suppression d'un fournisseur référencé par des dépenses les détache
+  (`supplierId = null`) sans supprimer les dépenses.
+- **Paiements fournisseurs** : dans « Achats & dépenses », bouton **Régler** par
+  achat (acomptes/partiels, historique, modification/suppression), colonnes
+  **Payé** / **Reste**, indicateurs **Total payé** et **Reste à payer (dettes)`.
+  Modèle identique aux règlements de factures clients.
+- L'éditeur de dépense choisit le **fournisseur dans la liste** (bouton « + nouveau
+  fournisseur » sur place).
+- `store.js` schéma **v5**, migration **v4 → v5**.
+
+## 7. Suite (v1.27)
+
+`v1.27 Fournisseurs & paiements fournisseurs` : collection `suppliers` (schéma v5),
+écran Fournisseurs, rattachement dépense → fournisseur, règlements par achat
+(reste à payer), KPI dédiés, aide bilingue, tests.
