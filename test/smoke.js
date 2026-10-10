@@ -58,6 +58,7 @@ const storeStub = {
     { id: 't4', date: '2026-11-02', label: 'VIREMENT HORS PERIODE', amount: 500, status: 'new', linkedInvoiceId: null }
   ],
   rules: [],
+  expenses: [],
   meta: { invoiceSeq: 0, quoteSeq: 0, creditSeq: 0 }
 };
 
@@ -209,11 +210,17 @@ ipcMain.handle('aging:export-csv', (event, payload) => {
   lastAgingExport = payload || null;
   return { canceled: false, path: path.join(__dirname, '.tmp', 'balance-agee.csv') };
 });
+/* Achats & dépenses : même principe (contenu CSV mémorisé). */
+let lastExpenseExport = null;
+ipcMain.handle('expense:export-csv', (event, payload) => {
+  lastExpenseExport = payload || null;
+  return { canceled: false, path: path.join(__dirname, '.tmp', 'depenses.csv') };
+});
 ipcMain.handle('export:close-period', async (event, period) => {
   const pack = exportPack.buildPack(storeStub, {
     from: period && period.from,
     to: period && period.to,
-    appVersion: '1.25'
+    appVersion: '1.26'
   });
   const zipPath = path.join(__dirname, '.tmp', pack.base + '_cloture.zip');
   fs.writeFileSync(zipPath, exportPack.zipBuffer(pack.files));
@@ -221,7 +228,7 @@ ipcMain.handle('export:close-period', async (event, period) => {
 });
 
 /* Version de l'application (lue dans package.json par le vrai main.js) */
-ipcMain.handle('app:version', () => '1.25');
+ipcMain.handle('app:version', () => '1.26');
 
 function check(name, cond, detail) {
   if (cond) console.log('  ok   ' + name);
@@ -279,13 +286,13 @@ async function phaseUi() {
   })()`);
 
   check('API preload présente', base.hasApi);
-  check('12 vues rendues (dont Avoirs, Balance âgée, Paiements et Devis)', base.views === 12, base.views);
+  check('13 vues rendues (dont Avoirs, Balance âgée, Achats & dépenses, Paiements, Devis)', base.views === 13, base.views);
   check('nom de l\'application = MAZ-FATORA', base.title === 'MAZ-FATORA', base.title);
   check('logo de marque chargé (Logo.png)', base.logo && base.logo.ok, base.logo);
   check('logo posé sur fond blanc (lisibilité sur la sidebar bleue)',
     base.brandBg === 'rgb(255, 255, 255)', base.brandBg);
   check('favicon Icon.png déclaré', /Icon\.png/.test(base.favicon || ''), base.favicon);
-  check('version affichée dans la sidebar (v1.25)', base.version === 'v1.25', base.version);
+  check('version affichée dans la sidebar (v1.26)', base.version === 'v1.26', base.version);
   check('tableau de bord rempli', base.dashRendered);
   check('parseur CSV', !base.csvError && base.csv && base.csv.length === 3 &&
     base.csv[0].amount === 1200.5 && base.csv[1].amount === -25.5 && base.csv[2].amount === 34.99, base.csv || base.csvError);
@@ -638,8 +645,8 @@ async function phaseExtras(win) {
       dbPath: (document.querySelector('#set-db-path') || {}).value || ''
     };
   })()`);
-  check('12 vues et 12 entrées de menu (nouvelles vues Avoirs et Balance âgée)',
-    entry.views === 12 && entry.navs === 12, entry);
+  check('13 vues et 13 entrées de menu (vues Avoirs, Balance âgée et Achats & dépenses)',
+    entry.views === 13 && entry.navs === 13, entry);
   check('accès « Nouvelle facture » (tableau de bord + factures validées)',
     entry.dashBtn && entry.invBtn, entry);
   check('vue Paiements : recherche et filtre présents', entry.payFilters, entry);
@@ -985,8 +992,8 @@ async function phaseExtras(win) {
       payments: val[0] ? (val[0].payments || []).length : -1
     };
   })()`);
-  check('état final propre (12 vues, modale fermée, base affichée, 1 règlement)',
-    final.views === 12 && final.modalHidden && final.dbPath === DATA_DIR && final.payments === 1, final);
+  check('état final propre (13 vues, modale fermée, base affichée, 1 règlement)',
+    final.views === 13 && final.modalHidden && final.dbPath === DATA_DIR && final.payments === 1, final);
 }
 
 async function phasePdf(uiWin) {
@@ -1140,12 +1147,16 @@ async function phaseImportGroup(uiWin) {
     autogen: document.querySelector('#opt-autogen').checked,
     tva: document.querySelector('#import-tva').value,
     rows: document.querySelectorAll('#import-table tbody tr').length,
+    debitRows: document.querySelectorAll('#import-debits-table tbody tr').length,
+    debitsOpt: document.querySelector('#opt-debits').checked,
     summary: (document.querySelector('#import-summary') || {}).innerText || ''
   })`);
   check('2b : aperçu affiché, seuls les virements reçus listés (2 sur 4 lignes)',
     prev.visible && prev.rows === 2, prev);
-  check('2b : débits annoncés comme écartés dans le récapitulatif',
-    /Débits écartés/.test(prev.summary) && /2/.test(prev.summary), prev.summary);
+  check('2b : les débits du relevé sont listés (2) et proposés comme dépenses',
+    prev.debitRows === 2 && prev.debitsOpt === true, prev);
+  check('2b : débits annoncés comme dépenses dans le récapitulatif (option cochée par défaut)',
+    /Débits ·/.test(prev.summary) && prev.debitRows === 2, prev);
   check('2b : client unique pré-sélectionné automatiquement', prev.client === 'c1', prev);
   check('2b : « une seule facture avec plusieurs lignes » coché et actif',
     prev.groupChecked && !prev.groupDisabled, prev);
@@ -1222,6 +1233,8 @@ async function phaseImportGroup(uiWin) {
     ttc: state.invoices[0] ? state.invoices[0].lines.reduce((s, l) => s + l.price * (1 + l.tva / 100), 0) : 0,
     view: (document.querySelector('.view.active') || {}).id,
     savedClient: state.settings.importClientId,
+    expenses: state.expenses.length,
+    expenseTvaZero: state.expenses.every((e) => e.tvaRate === 0),
     toast: (document.querySelector('#toast') || {}).textContent || ''
   })`);
   check('2b : UNE SEULE facture créée pour tout le relevé', st.inv === 1, st);
@@ -1234,8 +1247,10 @@ async function phaseImportGroup(uiWin) {
     st.creditsLinked === 2 && st.debitsLinked === 0, st);
   check('2b : somme TTC des lignes = total des encaissements (3 900,00)',
     Math.abs(st.ttc - 3900) < 0.5, st.ttc);
-  check('2b : toast « débits écartés » + « facture regroupée » + brouillons',
-    /débit\(s\) écarté\(s\)/.test(st.toast) && /facture regroupée/.test(st.toast) &&
+  check('2b : débits convertis en dépenses (2, TVA 0 %)',
+    st.expenses === 2 && st.expenseTvaZero, st);
+  check('2b : toast « dépense(s) créée(s) » + « facture regroupée » + brouillons',
+    /dépense\(s\) créée\(s\)/.test(st.toast) && /facture regroupée/.test(st.toast) &&
     st.view === 'view-drafts', st);
   check('2b : choix mémorisé pour le prochain import', st.savedClient === 'c1', st);
 
@@ -1840,7 +1855,7 @@ async function phaseSecurite(uiWin) {
   })()`);
   check('3 : sans protection, l\'application s\'ouvre normalement (pas d\'écran de verrouillage)',
     s0.lockHidden === true && s0.lockBtnHidden === true && s0.hasSecCard === true &&
-    s0.enableHidden === false && s0.views === 12 && s0.dash.length > 0, s0);
+    s0.enableHidden === false && s0.views === 13 && s0.dash.length > 0, s0);
 
   /* --- b) activation : Paramètres → Sécurité → « Activer la protection » --- */
   await ev(win, `showView('settings'); true`);
@@ -2793,7 +2808,7 @@ async function phaseHelp(win) {
     };
   })()`);
   check('aide : contenu et moteur chargés',
-    loaded.hasContent && loaded.hasUi && loaded.articles >= 43 && loaded.cats >= 5 && loaded.screens === 12, loaded);
+    loaded.hasContent && loaded.hasUi && loaded.articles >= 45 && loaded.cats >= 5 && loaded.screens === 13, loaded);
 
   const triggers = await ev(win, `(function () {
     return {
@@ -2803,7 +2818,7 @@ async function phaseHelp(win) {
     };
   })()`);
   check('aide : bouton latéral présent', triggers.side === true, triggers);
-  check('aide : bouton « ? » sur chaque écran', triggers.screenBtns === 12, triggers);
+  check('aide : bouton « ? » sur chaque écran', triggers.screenBtns === 13, triggers);
 
   await ev(win, `(function () {
     showView('invoices');
@@ -3024,7 +3039,7 @@ async function phaseGuide(win) {
   })()`);
   check('guide : couverture, sommaire, articles et aide-mémoire rendus (FR)',
     fr.dir === 'ltr' && fr.title === 'Guide d’utilisation' && fr.toc && fr.memo && fr.articles >= 40, fr);
-  check('guide : version affichée sur la couverture', /v1\.25/.test(fr.coverText), fr.coverText.slice(0, 100));
+  check('guide : version affichée sur la couverture', /v1\.26/.test(fr.coverText), fr.coverText.slice(0, 100));
 
   const pdf = await win.webContents.printToPDF({ printBackground: true, pageSize: 'A4' });
   check('guide : export PDF non vide (%PDF)',
@@ -3234,6 +3249,102 @@ async function phaseBalance(uiWin) {
     { name: exp.suggestedName, sample: String(exp.text || '').slice(0, 160) });
 }
 
+/* ---- PHASE : achats & dépenses (v1.26) ----
+   Saisie manuelle (montant TTC → HT + TVA déductible), filtre par catégorie,
+   import des débits du relevé convertis en dépenses (TVA 0 % par défaut) et
+   export CSV. */
+async function phaseExpenses(win) {
+  console.log('--- PHASE : ACHATS & DÉPENSES (v1.26) ---');
+  await win.loadFile(path.join(__dirname, '..', 'src', 'renderer', 'index.html'));
+  await wait(900);
+
+  const view = await ev(win, `(function () {
+    state.expenses = [
+      { id: 'x1', source: 'manual', date: '2026-09-05', label: 'Fournitures bureau', supplier: 'Papeterie Ali', category: 'Fournitures', amountTTC: 1200, tvaRate: 20, method: 'cash', reference: 'F-12' },
+      { id: 'x2', source: 'import', date: '2026-09-06', label: 'Loyer atelier', supplier: 'Bailleur', category: 'Loyer', amountTTC: 1000, tvaRate: 0 }
+    ];
+    renderAll();
+    showView('expenses');
+    return {
+      total: document.querySelector('#exp-stat-total').textContent,
+      tva: document.querySelector('#exp-stat-tva').textContent,
+      count: document.querySelector('#exp-stat-count').textContent,
+      rows: document.querySelectorAll('#exp-table tbody tr').length,
+      pills: document.querySelectorAll('#exp-table tbody .pill').length
+    };
+  })()`);
+  /* x1 : 1 200 TTC (TVA 200) ; x2 : 1 000 → total 2 200,00 ; TVA 200,00 */
+  check('dépenses : total 2 200,00 · TVA déductible 200,00 (2 lignes)',
+    /2\s?200,00/.test(view.total) && /200,00/.test(view.tva) && view.rows === 2, view);
+  check('dépenses : dépense importée signalée (1 badge Import)', view.pills === 1, view);
+
+  /* Filtre par catégorie */
+  const filtered = await ev(win, `(function () {
+    const sel = document.querySelector('#exp-filter');
+    sel.value = 'Fournitures';
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    const rows = document.querySelectorAll('#exp-table tbody tr').length;
+    sel.value = 'all';
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    return { rows: rows };
+  })()`);
+  check('dépenses : filtre par catégorie « Fournitures » → 1 ligne', filtered.rows === 1, filtered);
+
+  /* Saisie manuelle via l'éditeur */
+  await ev(win, `(function () {
+    document.querySelector('#btn-new-expense').click();
+    document.querySelector('#ex-label').value = 'Carburant voiture';
+    document.querySelector('#ex-amount').value = '600';
+    document.querySelector('#ex-supplier').value = 'Station Z';
+    document.querySelector('#ex-category').value = 'Déplacements';
+    document.querySelector('#ex-save').click();
+  })()`);
+  await wait(350);
+  const added = await ev(win, `(function () { const e = state.expenses[state.expenses.length - 1]; return { n: state.expenses.length, label: e.label, amount: e.amountTTC }; })()`);
+  check('dépenses : ajout manuel (éditeur) → 3 dépenses, montant TTC conservé',
+    added.n === 3 && added.label === 'Carburant voiture' && added.amount === 600, added);
+
+  /* Import des débits → dépenses */
+  const imported = await ev(win, `(async function () {
+    const entries = [
+      { date: '2026-09-10', label: 'Achat carburant station', amount: -300 },
+      { date: '2026-09-12', label: 'Virement client', amount: 1500 },
+      { date: '2026-09-13', label: 'Frais bancaires', amount: -45.5 }
+    ];
+    pendingImport = { fileName: 'releve.csv', entries: entries, parsed: { entries: entries, source: 'CSV', warnings: [], skipped: 0 } };
+    document.querySelector('#import-from').value = '';
+    document.querySelector('#import-to').value = '';
+    renderImportPreview(pendingImport.parsed);
+    const debitsRows = document.querySelectorAll('#import-debits-table tbody tr').length;
+    document.querySelector('#opt-debits').checked = true;
+    document.querySelector('#opt-autogen').checked = false;
+    document.querySelector('#opt-dedupe').checked = true;
+    document.querySelector('#import-client').value = '__rules__';
+    const before = state.expenses.length;
+    await doImport();
+    const created = state.expenses.slice(before);
+    return {
+      debitsRows: debitsRows,
+      created: created.length,
+      total: Math.round(created.reduce(function (s, e) { return s + e.amountTTC; }, 0) * 100) / 100,
+      tvaZero: created.every(function (e) { return e.tvaRate === 0; }),
+      isImport: created.every(function (e) { return e.source === 'import'; })
+    };
+  })()`);
+  check('import : les débits deviennent des dépenses (2 créées, TVA 0 %)',
+    imported.debitsRows === 2 && imported.created === 2 && imported.total === 345.5 &&
+    imported.tvaZero && imported.isImport, imported);
+
+  /* Export CSV */
+  await ev(win, `document.querySelector('#btn-export-expenses').click()`);
+  await wait(250);
+  const csv = lastExpenseExport || {};
+  check('dépenses : export CSV (en-tête, lignes, TVA déductible)',
+    /Date;Libellé/.test(csv.text || '') && /Fournitures bureau/.test(csv.text || '') &&
+    /200\.00/.test(csv.text || '') && /^depenses-\d{4}-\d{2}-\d{2}\.csv$/.test(csv.suggestedName || ''),
+    { name: csv.suggestedName, sample: String(csv.text || '').slice(0, 160) });
+}
+
 (async function main() {
   try {
     await app.whenReady();
@@ -3257,6 +3368,7 @@ async function phaseBalance(uiWin) {
     await phaseHelp(uiWin);
     await phaseCredits(uiWin);
     await phaseBalance(uiWin);
+    await phaseExpenses(uiWin);
   } catch (e) {
     problems.push('exception: ' + (e && e.stack ? e.stack : e));
   }

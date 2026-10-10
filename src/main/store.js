@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const COLLECTIONS = ['settings', 'clients', 'invoices', 'transactions', 'rules', 'quotes', 'creditNotes', 'meta'];
+const COLLECTIONS = ['settings', 'clients', 'invoices', 'transactions', 'rules', 'quotes', 'creditNotes', 'expenses', 'meta'];
 
 /* Version du schéma de données (P0 fiabilisation).
    - 0 = bases antérieures à la v1.13 (aucun marqueur écrit).
@@ -11,15 +11,19 @@ const COLLECTIONS = ['settings', 'clients', 'invoices', 'transactions', 'rules',
    - 2 = v1.15 : nouvelle collection « devis » (quotes, numérotation DV distincte).
    - 3 = v1.24 : nouvelle collection « avoirs » (creditNotes, numérotation AV
      distincte) et séquence meta.creditSeq.
+   - 4 = v1.26 : nouvelle collection « achats & dépenses » (expenses) et
+     catégories de dépenses dans les paramètres.
    Une base qui n'a pas de marqueur est considérée en version 0 puis migrée
    sans transformation tant qu'aucune évolution de structure n'est requise. */
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 /* Migrations : MIGRATIONS[v] = transformation pour passer de la version v à v+1.
    v1 → v2 (devis) : matérialise la collection quotes (nouvelle) et complète
    meta avec la séquence de numérotation des devis (quoteSeq).
    v2 → v3 (avoir) : matérialise la collection creditNotes (nouvelle) et complète
-   meta avec la séquence de numérotation des avoirs (creditSeq). */
+   meta avec la séquence de numérotation des avoirs (creditSeq).
+   v3 → v4 (dépenses) : matérialise la collection expenses (nouvelle) et les
+   catégories de dépenses dans les paramètres. */
 const MIGRATIONS = {
   1: (api) => {
     try {
@@ -37,6 +41,15 @@ const MIGRATIONS = {
       api.save('meta', api.read('meta'));
       /* creditNotes : nouvelle collection, matérialisée (vide). */
       api.save('creditNotes', api.read('creditNotes') || []);
+    } catch (e) { /* non bloquant : les défauts couvrent un échec de migration */ }
+  },
+  3: (api) => {
+    try {
+      /* settings : relu avec les défauts fusionnés (expenseCategories) puis
+         réécrit pour matérialiser le champ sur le disque. */
+      api.save('settings', api.read('settings'));
+      /* expenses : nouvelle collection, matérialisée (vide). */
+      api.save('expenses', api.read('expenses') || []);
     } catch (e) { /* non bloquant : les défauts couvrent un échec de migration */ }
   }
 };
@@ -72,7 +85,11 @@ const DEFAULTS = {
     quotePrefix: 'DV',
     quoteValidityDays: 30,
     creditPrefix: 'AV',
+    /* Achats & dépenses : catégories proposées à la saisie (modifiables). */
+    expenseCategories: ['Fournitures', 'Déplacements', 'Loyer', 'Télécom', 'Honoraires', 'Autres'],
+    defaultExpenseTva: 0,
     autoGenerateOnImport: true,
+    importDebitsAsExpenses: true,
     lockOnQuit: false
   },
   clients: [],
@@ -81,6 +98,7 @@ const DEFAULTS = {
   rules: [],
   quotes: [],
   creditNotes: [],
+  expenses: [],
   meta: { invoiceSeq: 0, quoteSeq: 0, creditSeq: 0 }
 };
 

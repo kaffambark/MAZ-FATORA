@@ -79,6 +79,9 @@
         <button class="nav-item" data-view="balance">
           <svg class="ic"><use href="#i-payments"/></svg><span class="nav-label" data-i18n="nav.balance">Balance âgée</span>
         </button>
+        <button class="nav-item" data-view="expenses">
+          <svg class="ic"><use href="#i-box"/></svg><span class="nav-label" data-i18n="nav.expenses">Achats &amp; dépenses</span>
+        </button>
         <button class="nav-item" data-view="payments">
           <svg class="ic"><use href="#i-payments"/></svg><span class="nav-label" data-i18n="nav.payments">Paiements</span>
         </button>
@@ -244,10 +247,18 @@
             </label>
           </div>
           <div class="import-summary" id="import-summary"></div>
-          <p class="hint" data-i18n="imp.creditsOnly">Seuls les virements reçus (crédits) sont retenus : les débits du relevé sont écartés à l'import.</p>
+          <p class="hint" data-i18n="imp.creditsOnly">Seuls les virements reçus (crédits) alimentent les encaissements ; les débits du relevé peuvent alimenter les dépenses (option ci-dessous).</p>
           <p class="hint" data-i18n="imp.periodHint">Seules les transactions dont la date figure dans la période choisie sont affichées puis importées — tout le reste du fichier est laissé de côté.</p>
           <div class="table-wrap">
             <table id="import-table"></table>
+          </div>
+          <h3 class="muted" style="margin-top:14px" data-i18n="imp.debitsTitle">Débits du relevé (achats &amp; dépenses)</h3>
+          <label class="check">
+            <input type="checkbox" id="opt-debits" checked>
+            <span data-i18n="imp.debits">Importer les débits comme dépenses</span>
+          </label>
+          <div class="table-wrap">
+            <table id="import-debits-table"></table>
           </div>
           <div id="import-warnings"></div>
           <div class="form-grid">
@@ -471,9 +482,48 @@
           <div class="table-wrap">
             <table id="bal-table"></table>
           </div>
-          <h3 class="muted" style="margin-top:14px" data-i18n="bal.buckets">Répartition par ancienneté</span></h3>
+          <h3 class="muted" style="margin-top:14px" data-i18n="bal.buckets">Répartition par ancienneté</h3>
           <div class="table-wrap">
             <table id="bal-buckets"></table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ACHATS & DÉPENSES -->
+      <section id="view-expenses" class="view">
+        <header class="view-header">
+          <h1 data-i18n="exp.title">Achats &amp; dépenses</h1>
+          <div class="actions">
+            <input type="search" id="exp-search" data-i18n-ph="exp.search" placeholder="Rechercher un fournisseur, un libellé…">
+            <select id="exp-filter">
+              <option value="all" data-i18n="exp.filterAll">Toutes les catégories</option>
+            </select>
+            <button class="btn" id="btn-export-expenses">
+              <svg class="ic"><use href="#i-download"/></svg><span data-i18n="exp.export">Exporter (CSV)</span>
+            </button>
+            <button class="btn primary" id="btn-new-expense">
+              <svg class="ic"><use href="#i-plus"/></svg><span data-i18n="exp.new">Nouvelle dépense</span>
+            </button>
+          </div>
+        </header>
+
+        <div class="stats">
+          <div class="stat card">
+            <span class="stat-label" data-i18n="exp.total">Total dépenses (TTC)</span>
+            <span class="stat-value money" id="exp-stat-total">0,00 MAD</span>
+            <span class="stat-sub" id="exp-stat-count"></span>
+          </div>
+          <div class="stat card">
+            <span class="stat-label" data-i18n="exp.totalTva">TVA déductible</span>
+            <span class="stat-value money" id="exp-stat-tva">0,00 MAD</span>
+            <span class="stat-sub"></span>
+          </div>
+        </div>
+
+        <div class="card">
+          <p class="hint" data-i18n="exp.hint">Enregistrez vos achats et dépenses (fournisseur, catégorie, TVA déductible).</p>
+          <div class="table-wrap">
+            <table id="exp-table"></table>
           </div>
         </div>
       </section>

@@ -25,7 +25,7 @@
 
 (function (root) {
   /* Écrans de l'application (ancrage de l'aide contextuelle). */
-  const SCREENS = ['dashboard', 'import', 'transactions', 'drafts', 'invoices', 'quotes', 'credits', 'balance', 'payments', 'clients', 'rules', 'settings'];
+  const SCREENS = ['dashboard', 'import', 'transactions', 'drafts', 'invoices', 'quotes', 'credits', 'balance', 'expenses', 'payments', 'clients', 'rules', 'settings'];
 
   const CATEGORIES = [
     { id: 'start', title: { fr: 'Démarrage', ar: 'البدء' }, icon: 'i-dash' },
@@ -426,6 +426,42 @@
         ]
       },
       related: ['screen.payments', 'screen.invoices', 'screen.credits']
+    },
+
+    'screen.expenses': {
+      category: 'screen', screen: 'expenses', priority: 1,
+      title: { fr: 'Achats & dépenses', ar: 'المشتريات والمصاريف' },
+      goal: {
+        fr: "Enregistrer vos achats et dépenses (fournisseur, catégorie, TVA déductible).",
+        ar: 'تسجيل مشترياتك ومصاريفك (المورد، الفئة، الضريبة القابلة للخصم).'
+      },
+      steps: {
+        fr: [
+          'Ouvrez « Achats & dépenses ».',
+          'Cliquez sur « Nouvelle dépense » et renseignez la date, le libellé et le montant TTC.',
+          'Indiquez le fournisseur, la catégorie et le taux de TVA déductible si vous facturez la TVA.',
+          'Vous pouvez aussi importer les débits d’un relevé bancaire (Import → option « Importer les débits comme dépenses »).'
+        ],
+        ar: [
+          'افتح «المشتريات والمصاريف».',
+          'اضغط على «مصروف جديد» واملأ التاريخ والبيان والمبلغ شامل الضريبة.',
+          'حدّد المورد والفئة ونسبة الضريبة القابلة للخصم إن كنت تخصم الضريبة.',
+          'يمكنك أيضًا استيراد مدفوعات كشف بنكي (استيراد ← خيار «استيراد المدفوعات كمصاريف»).'
+        ]
+      },
+      tips: {
+        fr: [
+          'Le montant saisi est TTC : le HT et la TVA en sont calculés automatiquement.',
+          'La TVA déductible s’ajoute à la TVA collectée de vos ventes pour votre déclaration.',
+          'Exportez la liste en CSV pour votre comptable.'
+        ],
+        ar: [
+          'المبلغ المُدخل شامل الضريبة: يُحسب المبلغ دون ضريبة والضريبة تلقائيًا.',
+          'تُضاف الضريبة القابلة للخصم إلى الضريبة المحصلة من مبيعاتك لإعداد التصريح.',
+          'صدّر القائمة بصيغة CSV لمحاسبك.'
+        ]
+      },
+      related: ['screen.import', 'screen.dashboard', 'screen.settings']
     },
 
     'screen.payments': {

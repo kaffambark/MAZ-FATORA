@@ -575,6 +575,7 @@ function renderAll() {
   renderQuotes();
   renderCredits();
   renderBalance();
+  renderExpenses();
   renderPayments();
   renderClients();
   renderRules();
@@ -1076,6 +1077,183 @@ async function exportBalanceCsv() {
   if (!res || res.canceled) return;
   if (res.error) { toast(tr('common.error') + (res.msg || ''), 'error'); return; }
   toast(tr('bal.exported', { path: res.path }), 'ok');
+}
+
+/* ---------------- Achats & dépenses (vue) ----------------
+   Collection unique « expenses » : chaque dépense porte un fournisseur, une
+   catégorie et un taux de TVA déductible. Le montant saisi est TTC ; le HT et
+   la TVA en sont déduits. Les débits du relevé bancaire peuvent alimenter
+   cette collection lors de l'import. */
+
+function expenseHtTva(e) {
+  const ttc = round2(Number(e && e.amountTTC) || 0);
+  const rate = Number(e && e.tvaRate) || 0;
+  const ht = round2(ttc / (1 + rate / 100));
+  return { ttc, ht, tva: round2(ttc - ht) };
+}
+
+function expenseCategories() {
+  const base = Array.isArray(state.settings.expenseCategories) ? state.settings.expenseCategories.slice() : [];
+  for (const e of (state.expenses || [])) {
+    if (e.category && base.indexOf(e.category) === -1) base.push(e.category);
+  }
+  return base;
+}
+
+function expenseById(id) { return (state.expenses || []).find((e) => e.id === id) || null; }
+
+function renderExpenses() {
+  const list = (state.expenses || []).slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+  const cats = expenseCategories();
+
+  /* Filtre par catégorie : options reconstruites (catégories paramétrées + utilisées). */
+  const sel = $('#exp-filter');
+  const cur = sel.value || 'all';
+  sel.innerHTML = `<option value="all">${esc(tr('exp.filterAll'))}</option>` +
+    cats.map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  sel.value = (cur !== 'all' && cats.indexOf(cur) !== -1) ? cur : 'all';
+
+  let total = 0, tvaTotal = 0;
+  for (const e of list) { const t = expenseHtTva(e); total += t.ttc; tvaTotal += t.tva; }
+  $('#exp-stat-total').textContent = money(round2(total));
+  $('#exp-stat-tva').textContent = money(round2(tvaTotal));
+  $('#exp-stat-count').textContent = tr('exp.count', { n: list.length });
+
+  const q = norm($('#exp-search').value);
+  const f = $('#exp-filter').value;
+  const view = list.filter((e) => {
+    if (f !== 'all' && (e.category || '') !== f) return false;
+    if (q && !norm(`${e.label || ''} ${e.supplier || ''} ${e.reference || ''} ${e.category || ''}`).includes(q)) return false;
+    return true;
+  });
+
+  const rows = view.map((e) => {
+    const t = expenseHtTva(e);
+    const badge = e.source === 'import' ? ` <span class="pill blue">${tr('exp.sourceImport')}</span>` : '';
+    const sub = e.reference ? `<div class="muted small">${esc(tr('exp.ref', { r: e.reference }))}</div>` : '';
+    return `
+    <tr>
+      <td>${dateFR(e.date)}</td>
+      <td><strong>${esc(e.label || '—')}</strong>${badge}${sub}</td>
+      <td>${esc(e.supplier || '—')}</td>
+      <td>${e.category ? esc(e.category) : `<span class="muted">${esc(tr('exp.noCategory'))}</span>`}</td>
+      <td>${e.method ? esc(methodLabel(e.method)) : '—'}</td>
+      <td class="num">${money(t.ttc)}</td>
+      <td class="num">${t.tva > 0 ? money(t.tva) : '—'}</td>
+      <td>
+        <div class="row-actions">
+          <button class="btn small" data-action="edit-expense" data-id="${esc(e.id)}">${tr('common.edit')}</button>
+          <button class="btn small danger" data-action="delete-expense" data-id="${esc(e.id)}">${tr('common.delete')}</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  $('#exp-table').innerHTML = `
+    <thead><tr>
+      <th>${tr('exp.hDate')}</th><th>${tr('exp.hLabel')}</th><th>${tr('exp.hSupplier')}</th>
+      <th>${tr('exp.hCategory')}</th><th>${tr('exp.hMethod')}</th>
+      <th class="num">${tr('exp.hTTC')}</th><th class="num">${tr('exp.hTva')}</th><th></th>
+    </tr></thead>
+    <tbody>${rows || `<tr><td colspan="8" class="empty">${tr('exp.empty')}</td></tr>`}</tbody>`;
+}
+
+function openExpenseEditor(id) {
+  const e = id ? state.expenses.find((x) => x.id === id) : null;
+  const cats = expenseCategories();
+  const catOptions = cats.map((c) => `<option value="${esc(c)}"></option>`).join('');
+  const today = todayISO();
+  const t = e ? expenseHtTva(e) : { ttc: 0 };
+  const tvaVal = e && e.tvaRate !== undefined && e.tvaRate !== null ? e.tvaRate : (state.settings.defaultExpenseTva || 0);
+
+  openModal(`
+    <h2>${e ? tr('exp.edit') : tr('exp.new')}</h2>
+    <div class="form-grid" style="margin-top:14px">
+      <label>${tr('exp.formDate')} <input type="date" id="ex-date" value="${esc(e ? (e.date || '') : today)}"></label>
+      <label>${tr('exp.formAmount')} <input type="number" id="ex-amount" step="0.01" min="0" value="${esc(e ? t.ttc : '')}"></label>
+      <label class="wide">${tr('exp.formLabel')} <input type="text" id="ex-label" value="${esc(e ? (e.label || '') : '')}"></label>
+      <label>${tr('exp.formSupplier')} <input type="text" id="ex-supplier" value="${esc(e ? (e.supplier || '') : '')}"></label>
+      <label>${tr('exp.formCategory')}
+        <input type="text" id="ex-category" list="ex-cats" value="${esc(e ? (e.category || '') : '')}">
+        <datalist id="ex-cats">${catOptions}</datalist>
+      </label>
+      <label>${tr('exp.formTva')} <select id="ex-tva">${tvaOptionsHTML(tvaVal)}</select></label>
+      <label>${tr('exp.formMethod')}
+        <select id="ex-method"><option value="">${tr('exp.formMethod')}…</option>${METHODS.map((m) => `<option value="${m}" ${e && e.method === m ? 'selected' : ''}>${esc(methodLabel(m))}</option>`).join('')}</select>
+      </label>
+      <label class="wide">${tr('exp.formRef')} <input type="text" id="ex-ref" value="${esc(e ? (e.reference || '') : '')}"></label>
+      <label class="wide">${tr('exp.formNote')} <input type="text" id="ex-note" value="${esc(e ? (e.note || '') : '')}"></label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" id="ex-cancel">${tr('common.cancel')}</button>
+      <button class="btn primary" id="ex-save">${tr('common.save')}</button>
+    </div>`);
+
+  $('#ex-cancel').addEventListener('click', closeModal);
+  $('#ex-save').addEventListener('click', async () => {
+    const label = $('#ex-label').value.trim();
+    const amount = Number($('#ex-amount').value);
+    if (!label) { toast(tr('exp.needLabel'), 'error'); return; }
+    if (isNaN(amount) || amount <= 0) { toast(tr('exp.needAmount'), 'error'); return; }
+    const category = $('#ex-category').value.trim();
+    const tvaInput = Number($('#ex-tva').value);
+    const data = {
+      date: $('#ex-date').value || todayISO(),
+      label,
+      supplier: $('#ex-supplier').value.trim(),
+      category,
+      amountTTC: round2(amount),
+      tvaRate: isNaN(tvaInput) ? 0 : tvaInput,
+      method: $('#ex-method').value || '',
+      reference: $('#ex-ref').value.trim(),
+      note: $('#ex-note').value.trim()
+    };
+    if (e) Object.assign(e, data);
+    else state.expenses.push({ id: uid(), source: 'manual', createdAt: new Date().toISOString(), ...data });
+    /* nouvelle catégorie saisie : mémorisée pour les prochaines dépenses */
+    if (category && (state.settings.expenseCategories || []).indexOf(category) === -1) {
+      state.settings.expenseCategories = expenseCategories();
+      await persist('settings');
+    }
+    await persist('expenses');
+    renderAll();
+    closeModal();
+    toast(tr('exp.saved'), 'success');
+  });
+}
+
+async function deleteExpense(id) {
+  const e = state.expenses.find((x) => x.id === id);
+  if (!e) return;
+  if (!(await confirmBox(tr('exp.delConfirm', { label: e.label || '' }), { okLabel: tr('common.delete'), okClass: 'danger' }))) return;
+  state.expenses = state.expenses.filter((x) => x.id !== id);
+  await persist('expenses');
+  renderAll();
+  toast(tr('exp.deleted'));
+}
+
+function expensesCsvText() {
+  const esc = (v) => {
+    const s = String(v === null || v === undefined ? '' : v);
+    return /[";\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  const list = (state.expenses || []).slice().sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+  const head = [tr('exp.hDate'), tr('exp.hLabel'), tr('exp.hSupplier'), tr('exp.hCategory'), tr('exp.hMethod'), tr('exp.hHT'), tr('exp.hTva'), tr('exp.hTTC'), tr('exp.formRef')];
+  const out = [head];
+  for (const e of list) {
+    const t = expenseHtTva(e);
+    out.push([e.date || '', e.label || '', e.supplier || '', e.category || '', e.method ? methodLabel(e.method) : '', t.ht.toFixed(2), t.tva.toFixed(2), t.ttc.toFixed(2), e.reference || '']);
+  }
+  return '\uFEFF' + out.map((r) => r.map(esc).join(';')).join('\r\n');
+}
+
+async function exportExpensesCsv() {
+  const text = expensesCsvText();
+  const suggestedName = 'depenses-' + todayISO() + '.csv';
+  const res = await window.factapi.expenseExportCsv({ text, suggestedName });
+  if (!res || res.canceled) return;
+  if (res.error) { toast(tr('common.error') + (res.msg || ''), 'error'); return; }
+  toast(tr('exp.exported', { path: res.path }), 'ok');
 }
 
 function renderPayments() {
@@ -2625,14 +2803,19 @@ function renderImportPreview(parsed) {
   const liveTva = wasVisible ? ($('#import-tva') || {}).value : '';
   const liveMode = wasVisible ? ($$('input[name="import-mode"]:checked')[0] || {}).value : '';
   const liveAutogen = wasVisible ? $('#opt-autogen').checked : undefined;
+  const liveDebits = wasVisible ? $('#opt-debits').checked : undefined;
 
-  /* D'abord la PÉRIODE choisie (tout le reste du fichier est écarté),
-     puis seuls les virements reçus (crédits) sont retenus :
-     les débits ne sont ni importés, ni affichés, ni facturés. */
+  /* D'abord la PÉRIODE choisie (tout le reste du fichier est écarté).
+     Les virements reçus (crédits) alimentent les encaissements ; les débits
+     peuvent alimenter les dépenses (achats) si l'option est cochée. */
   const inPeriod = parsed.entries.filter(inImportPeriod);
   const outPeriod = parsed.entries.filter((e) => !inImportPeriod(e));
   const entries = inPeriod.filter((e) => e.amount > 0);
-  const discarded = inPeriod.filter((e) => !(e.amount > 0));
+  const debits = inPeriod.filter((e) => !(e.amount > 0));
+  const discarded = debits;
+  const importDebits = liveDebits !== undefined
+    ? liveDebits
+    : (state.settings.importDebitsAsExpenses !== false);
   /* Transactions visibles (aperçu limité à 50) — avec cases à cocher (toutes cochées par défaut) */
   const visible = entries.slice(0, 50);
   if (!pendingImport.credits || pendingImport.credits.length !== entries.length || !pendingImport.selected) {
@@ -2659,7 +2842,9 @@ function renderImportPreview(parsed) {
     <div class="is-item"><span class="is-value">${parsed.entries.length}</span><span class="is-label">${tr('imp.sumLines', { n: parsed.skipped })}</span></div>
     <div class="is-item"><span class="is-value">${inPeriod.length}</span><span class="is-label">${tr('imp.sumInPeriod', { n: outPeriod.length })}</span></div>
     <div class="is-item"><span class="is-value">${credCount}</span><span class="is-label">${tr('imp.sumCredits', { v: money(pendingImport.credits.reduce((s, e) => s + e.amount, 0)) })}</span></div>
-    <div class="is-item"><span class="is-value">${discarded.length}</span><span class="is-label">${tr('imp.sumDiscarded', { v: money(Math.abs(discarded.reduce((s, e) => s + e.amount, 0))) })}</span></div>
+    <div class="is-item"><span class="is-value">${debits.length}</span><span class="is-label">${importDebits
+      ? tr('imp.sumDebits', { v: money(Math.abs(debits.reduce((s, e) => s + e.amount, 0))) })
+      : tr('imp.sumDiscarded', { v: money(Math.abs(discarded.reduce((s, e) => s + e.amount, 0))) })}</span></div>
     <div class="is-item"><span class="is-value">${newCount}</span><span class="is-label">${tr('imp.sumNew')}</span></div>
     <div class="is-item"><span class="is-value">${selCount}${selTotal}</span><span class="is-label">${tr('imp.selCount')}</span></div>`;
 
@@ -2675,6 +2860,18 @@ function renderImportPreview(parsed) {
       <td class="num ${e.amount >= 0 ? 'amount-credit' : 'amount-debit'}">${money(e.amount)}</td>
     </tr>`).join('');
   $('#import-table').innerHTML = head + `<tbody>${body}</tbody>`;
+
+  /* Débits du relevé : ils deviennent des dépenses si l'option est cochée. */
+  $('#opt-debits').checked = importDebits;
+  const dhead = `<thead><tr><th>${tr('common.date')}</th><th>${tr('common.label')}</th><th class="num">${tr('common.amount')}</th></tr></thead>`;
+  const dbody = debits.slice(0, 50).map((e) => `
+    <tr>
+      <td>${dateFR(e.date)}</td>
+      <td>${esc(e.label)}</td>
+      <td class="num amount-debit">${money(Math.abs(e.amount))}</td>
+    </tr>`).join('');
+  $('#import-debits-table').innerHTML = dhead +
+    `<tbody>${dbody || `<tr><td colspan="3" class="empty">${tr('imp.debitsEmpty')}</td></tr>`}</tbody>`;
 
   /* Client + taux + mode de facturation de l'import (mémorisés entre deux imports) */
   const clientSel = $('#import-client');
@@ -2744,6 +2941,7 @@ async function doImport() {
   const due = $('#import-due-date').value || addDays(issue, paymentDelay());
   const dedupe = $('#opt-dedupe').checked;
   const autogen = $('#opt-autogen').checked;
+  const importDebits = $('#opt-debits').checked;
 
   const clientSel = $('#import-client').value;
   const modeRadio = $$('input[name="import-mode"]:checked')[0];
@@ -2760,9 +2958,10 @@ async function doImport() {
   const kept = pendingImport.credits && pendingImport.selected
     ? pendingImport.credits.filter((_, i) => pendingImport.selected.has(i))
     : inPeriodCredits;
-  const debitsDiscarded = inPeriod.length - inPeriodCredits.length;
+  const inPeriodDebits = inPeriod.filter((e) => !(e.amount > 0));
   const unchecked = inPeriodCredits.length - kept.length;
-  const discarded = debitsDiscarded;
+  /* Les débits écartés ne le sont plus s'ils sont convertis en dépenses. */
+  const discarded = importDebits ? 0 : inPeriodDebits.length;
   const existingKeys = new Set(state.transactions.map((t) => txKey(t)));
   const importedTx = [];
   let added = 0, skipped = 0;
@@ -2833,11 +3032,44 @@ async function doImport() {
     await persist('invoices', 'transactions');
   }
 
+  /* Débits → dépenses (achats) : une dépense par débit de la période, TVA
+     déductible à 0 % par défaut (ajustable ensuite dans « Achats & dépenses »). */
+  let expensesAdded = 0;
+  if (importDebits && inPeriodDebits.length) {
+    const importKey = (e) => `${e.date || ''}|${Number(e.amount).toFixed(2)}|${norm(e.label)}`;
+    const existingExp = new Set((state.expenses || [])
+      .filter((x) => x.source === 'import' && x.importKey)
+      .map((x) => x.importKey));
+    for (const e of inPeriodDebits) {
+      const k = importKey(e);
+      if (dedupe && existingExp.has(k)) continue;
+      existingExp.add(k);
+      state.expenses.push({
+        id: uid(),
+        date: e.date || '',
+        label: e.label || '',
+        supplier: '',
+        category: '',
+        amountTTC: round2(Math.abs(e.amount)),
+        tvaRate: Number(state.settings.defaultExpenseTva) || 0,
+        method: '',
+        reference: '',
+        note: '',
+        source: 'import',
+        importKey: k,
+        createdAt: new Date().toISOString()
+      });
+      expensesAdded++;
+    }
+    await persist('expenses');
+  }
+
   /* mémorise les choix pour le prochain import */
   state.settings.importClientId = clientSel;
   state.settings.importMode = mode;
   state.settings.importTva = tvaRate;
   state.settings.autoGenerateOnImport = autogen;
+  state.settings.importDebitsAsExpenses = importDebits;
   await persist('settings');
 
   const fileName = pendingImport.fileName;
@@ -2850,10 +3082,11 @@ async function doImport() {
     (skipped ? tr('imp.doneSkipped', { n: skipped }) : '') +
     (unchecked ? tr('imp.doneUnchecked', { n: unchecked }) : '') +
     (discarded ? tr('imp.doneDiscarded', { n: discarded }) : '') +
+    (expensesAdded ? tr('imp.doneExpenses', { n: expensesAdded }) : '') +
     (outPeriod ? tr('imp.doneOutPeriod', { n: outPeriod }) : '') +
     (grouped ? tr('imp.doneGrouped', { n: grouped.lines.length })
       : created.length ? tr('imp.doneCreated', { n: created.length }) : '') + '.', 'success');
-  showView(created.length ? 'drafts' : 'transactions');
+  showView(created.length ? 'drafts' : (expensesAdded ? 'expenses' : 'transactions'));
 }
 
 /* ---------------- Clients ---------------- */
@@ -3027,6 +3260,7 @@ function applyBackupData(data) {
   state.rules = (data && data.rules) || [];
   state.quotes = (data && data.quotes) || [];
   state.creditNotes = (data && data.creditNotes) || [];
+  state.expenses = (data && data.expenses) || [];
   state.meta = (data && (data.meta && (data.meta.invoiceSeq !== undefined || data.meta.quoteSeq !== undefined || data.meta.creditSeq !== undefined))) ? data.meta : { invoiceSeq: 0, quoteSeq: 0, creditSeq: 0 };
   if (typeof I18N !== 'undefined') I18N.setLang(state.settings.language || 'fr');
   syncLangButtons();
@@ -3492,6 +3726,8 @@ document.addEventListener('click', async (e) => {
       break;
     }
     case 'new-credit-from-invoice': openCreditEditor(null, id); break;
+    case 'edit-expense': openExpenseEditor(id); break;
+    case 'delete-expense': await deleteExpense(id); break;
     case 'pay-invoice': openPaymentModal(id); break;
     case 'pay-edit': openEditPaymentModal(id, el.dataset.pay); break;
     case 'pay-delete': await deletePayment(id, el.dataset.pay); break;
@@ -3594,6 +3830,11 @@ $('#credit-filter').addEventListener('change', renderCredits);
 $('#bal-search').addEventListener('input', renderBalance);
 $('#bal-filter').addEventListener('change', renderBalance);
 $('#btn-export-balance').addEventListener('click', exportBalanceCsv);
+/* Achats & dépenses */
+$('#exp-search').addEventListener('input', renderExpenses);
+$('#exp-filter').addEventListener('change', renderExpenses);
+$('#btn-export-expenses').addEventListener('click', exportExpensesCsv);
+$('#btn-new-expense').addEventListener('click', () => { showView('expenses'); openExpenseEditor(null); });
 $('#btn-new-client').addEventListener('click', () => openClientEditor(null));
 $('#btn-new-rule').addEventListener('click', () => openRuleEditor(null));
 
@@ -4070,6 +4311,7 @@ async function loadAppData() {
     state.rules = data.rules || [];
     state.quotes = data.quotes || [];
     state.creditNotes = data.creditNotes || [];
+    state.expenses = data.expenses || [];
     state.meta = data.meta || { invoiceSeq: 0, quoteSeq: 0, creditSeq: 0 };
     /* Réparation : factures enregistrées sans identifiant (bug antérieur) —
        sans id, l'éditeur se rouvrait vide et « Régler » ne trouvait pas la facture. */

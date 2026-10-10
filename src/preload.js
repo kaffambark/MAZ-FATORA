@@ -42,6 +42,9 @@ contextBridge.exposeInMainWorld('factapi', {
   // Balance âgée (export CSV)
   agingExportCsv: (payload) => ipcRenderer.invoke('aging:export-csv', payload),
 
+  // Achats & dépenses (export CSV)
+  expenseExportCsv: (payload) => ipcRenderer.invoke('expense:export-csv', payload),
+
   // Guide d'utilisation imprimable
   guidePreview: (lang) => ipcRenderer.invoke('guide:preview', lang),
   guideExportPdf: (lang) => ipcRenderer.invoke('guide:export-pdf', lang),

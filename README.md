@@ -21,6 +21,8 @@ Trois modules complémentaires :
   (retour, remise, correction) ; ils réduisent le **reste dû** et la **TVA collectée** ;
 - **Balance âgée** : reste dû par client classé par ancienneté (non échu · 0-30 · 31-60 · 61-90 ·
   +90 j), net des encaissements et des avoirs, avec **export CSV** ;
+- **Achats & dépenses** : saisie des achats et frais avec **fournisseur**, **catégorie** et **TVA
+  déductible** ; les **débits** d'un relevé bancaire peuvent être **importés comme dépenses** ;
 - **Sauvegarde & restauration** de toute la base à l'**emplacement de votre choix** (fichier JSON).
 
 Et une **protection de l'application** (Paramètres → Sécurité), **version monoposte** : un **mot de
@@ -51,10 +53,28 @@ npm test
 
 ## Version
 
-La **version** s'affiche en bas de la barre latérale (ex. `v1.25`). À **chaque modification** du
+La **version** s'affiche en bas de la barre latérale (ex. `v1.26`). À **chaque modification** du
 projet, le champ `version` de `package.json` est incrémenté par la **partie mineure**
 (`1.0` → `1.1` → `1.2` …) et l'application affiche `major.minor`. Les noms d'installateurs
-reprennent la version complète (`1.25.0`).
+reprennent la version complète (`1.26.0`).
+
+## v1.26 — Achats & dépenses
+
+Nouvel écran **Achats & dépenses** pour suivre les achats et frais de l'entreprise :
+
+1. **Collection `expenses` dédiée** (schéma de données **v4**, migration automatique) : chaque
+   dépense porte une date, un libellé, un **fournisseur** (`المورد`), une **catégorie**, un
+   **montant TTC**, un **taux de TVA déductible**, un mode de paiement et une référence.
+2. **Calcul HT / TVA** : le montant saisi est **TTC** ; le HT et la **TVA déductible** en sont
+   déduits automatiquement (utile pour la déclaration de TVA).
+3. **Import des débits** : lors de l'import d'un relevé bancaire, les **débits** (jusqu'ici écartés)
+   peuvent être convertis en **dépenses** (option « Importer les débits comme dépenses ») ;
+   la **TVA déductible est à 0 % par défaut** à l'import, ajustable ensuite.
+4. **Catégories paramétrables** : liste par défaut (Fournitures, Déplacements, Loyer, Télécom,
+   Honoraires, Autres) ; une nouvelle catégorie saisie est mémorisée.
+5. **Vue consolidée** : indicateurs **Total dépenses (TTC)** et **TVA déductible**, recherche,
+   filtre par catégorie, tableau, ajout/modification/suppression, **export CSV**.
+6. **Aide** : nouvel écran + article bilingue (parité FR/AR vérifiée par les tests).
 
 ## v1.25 — Balance âgée (clients)
 

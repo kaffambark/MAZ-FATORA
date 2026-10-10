@@ -606,6 +606,29 @@ function registerIpc() {
     }
   }));
 
+  /* Achats & dépenses : export CSV (même principe que la balance âgée). */
+  ipcMain.handle('expense:export-csv', gated(async (event, payload) => {
+    const parent = ipcWindow(event);
+    const text = (payload && payload.text) || '';
+    const suggested = (payload && payload.suggestedName) || 'depenses.csv';
+    if (!text) return { error: 'empty' };
+    const save = await dialog.showSaveDialog(parent, {
+      title: I18N.tr('exp.exportTitle'),
+      defaultPath: path.join(app.getPath('documents'), suggested),
+      filters: [
+        { name: I18N.tr('main.filterCsv'), extensions: ['csv'] },
+        { name: I18N.tr('main.filterAll'), extensions: ['*'] }
+      ]
+    });
+    if (save.canceled || !save.filePath) return { canceled: true };
+    try {
+      fs.writeFileSync(save.filePath, text, 'utf8');
+      return { canceled: false, path: save.filePath };
+    } catch (e) {
+      return { canceled: false, error: 'write', msg: String(e && e.message ? e.message : e) };
+    }
+  }));
+
   ipcMain.handle('file:pick-statement', gated(async (event) => {
     const parent = ipcWindow(event);
     const res = await dialog.showOpenDialog(parent, {

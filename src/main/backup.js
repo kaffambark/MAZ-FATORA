@@ -7,7 +7,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const COLLECTIONS = ['settings', 'clients', 'invoices', 'transactions', 'rules', 'quotes', 'creditNotes', 'meta'];
+const COLLECTIONS = ['settings', 'clients', 'invoices', 'transactions', 'rules', 'quotes', 'creditNotes', 'expenses', 'meta'];
 
 function normalize(snapshot) {
   const out = {};
