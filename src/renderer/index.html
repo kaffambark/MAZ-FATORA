@@ -6,6 +6,7 @@
   <title>MAZ-FATORA</title>
   <link rel="icon" type="image/png" href="../../Icon.png">
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="help.css">
 </head>
 <body>
   <!-- Sprite d'icônes (SVG inline, embarqué — pas de CDN, conforme CSP) -->
@@ -42,6 +43,7 @@
       <symbol id="i-arrow-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="7" x2="17" y2="17"/><polyline points="17 7 17 17 7 17"/></symbol>
       <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></symbol>
       <symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></symbol>
+      <symbol id="i-help" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></symbol>
       <symbol id="i-rotate" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></symbol>
       <symbol id="i-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></symbol>
       <symbol id="i-quotes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/><circle cx="17" cy="19" r="2.2"/></symbol>
@@ -90,11 +92,18 @@
       </div>
 
       <div class="sidebar-footer">
-        <button class="theme-btn" id="btn-theme" type="button"
-          data-i18n-aria="ui.themeToDark" data-i18n-title="ui.themeToDark"
-          aria-label="Passer en thème sombre" title="Passer en thème sombre">
-          <svg class="ic"><use href="#i-moon"/></svg>
-        </button>
+        <div class="sidebar-actions">
+          <button class="theme-btn" id="btn-theme" type="button"
+            data-i18n-aria="ui.themeToDark" data-i18n-title="ui.themeToDark"
+            aria-label="Passer en thème sombre" title="Passer en thème sombre">
+            <svg class="ic"><use href="#i-moon"/></svg>
+          </button>
+          <button class="theme-btn" id="btn-help" type="button"
+            data-i18n-aria="help.open" data-i18n-title="help.open"
+            aria-label="Aide" title="Aide">
+            <svg class="ic"><use href="#i-help"/></svg>
+          </button>
+        </div>
         <button class="btn small block" id="btn-lock" hidden data-i18n="sec.lock">Verrouiller</button>
         <div class="company-name" id="sidebar-company">Société non configurée</div>
         <div class="muted small" id="app-version"></div>
@@ -783,12 +792,38 @@
     <div class="modal" id="modal-box"></div>
   </div>
 
+  <!-- CENTRE D'AIDE -->
+  <div class="help-backdrop" id="help-root" hidden>
+    <div class="help-panel" role="dialog" aria-modal="true" aria-labelledby="help-title">
+      <header class="help-head">
+        <h2 id="help-title" data-i18n="help.title">Centre d’aide</h2>
+        <button class="help-close" id="help-close" type="button"
+          data-i18n-aria="help.close" data-i18n-title="help.close" aria-label="Fermer" title="Fermer">
+          <svg class="ic"><use href="#i-close"/></svg>
+        </button>
+      </header>
+      <div class="help-body">
+        <aside class="help-nav">
+          <label class="help-search">
+            <svg class="ic"><use href="#i-search"/></svg>
+            <input type="text" id="help-search" data-i18n-ph="help.search" placeholder="Rechercher…" autocomplete="off">
+          </label>
+          <div id="help-results" class="help-results" hidden></div>
+          <nav id="help-toc" class="help-toc" data-i18n-aria="help.title" aria-label="Centre d’aide"></nav>
+        </aside>
+        <section class="help-article" id="help-article" tabindex="-1"></section>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" hidden></div>
 
   <script src="i18n.js"></script>
   <script src="csv.js"></script>
   <script src="words.js"></script>
   <script src="doc-config.js"></script>
+  <script src="help-content.js"></script>
+  <script src="help.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

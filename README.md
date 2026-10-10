@@ -47,10 +47,27 @@ npm test
 
 ## Version
 
-La **version** s'affiche en bas de la barre latérale (ex. `v1.18`). À **chaque modification** du
+La **version** s'affiche en bas de la barre latérale (ex. `v1.19`). À **chaque modification** du
 projet, le champ `version` de `package.json` est incrémenté par la **partie mineure**
 (`1.0` → `1.1` → `1.2` …) et l'application affiche `major.minor`. Les noms d'installateurs
-reprennent la version complète (`1.18.0`).
+reprennent la version complète (`1.19.0`).
+
+## v1.19 — Centre d'aide intégré (bilingue, hors ligne)
+
+Nouveau **Centre d'aide** consultable dans l'application, **sans aucune ressource réseau** :
+
+- **Bouton « ? »** sur chaque écran (en haut à droite) et **touche `F1`** : ouvre directement
+  l'aide de l'écran courant ;
+- **Bouton « ? »** en bas de la barre latérale : ouvre le sommaire complet ;
+- **Recherche** plein texte (insensible à la casse et aux accents) et navigation par
+  **renvois « Voir aussi »** entre articles ;
+- **Contenu unique FR/AR** (démarrage, écrans, tâches courantes, FAQ, glossaire) —
+  **parité des deux langues vérifiée par test** ;
+- Panneau **accessible** : `role="dialog"`, focus piégé, fermeture par `Échap`, bascule
+  **RTL** automatique en arabe.
+
+Le plan éditorial complet (vidéos, guide imprimable, onboarding) est documenté dans
+**`docs/plan-aide-utilisation.md`**.
 
 ## v1.18 — Identifiants légaux au choix + réglages appliqués aussitôt
 
@@ -476,7 +493,7 @@ src/
     pdf-statement.js    Extraction des relevés bancaires PDF (pdfjs-dist)
   preload.js            Pont sécurisé renderer ⇄ main
   renderer/
-    index.html          Interface (9 vues, libellés data-i18n)
+    index.html          Interface (10 vues, libellés data-i18n)
     styles.css          Thème + règles RTL (propriétés logiques)
     i18n.js            Dictionnaires FR / AR + API tr() / setLang() (UMD)
     app.js              Logique applicative (import, génération, factures, paiements, sauvegarde)
@@ -484,6 +501,9 @@ src/
     words.js            Montant en toutes lettres — français (dirhams) et arabe
     doc-config.js       Configuration des documents : schéma `settings.doc`, normalisation,
                         modèles, palettes, formats (partagé app ⇄ impression)
+    help-content.js     Contenu du Centre d'aide (source unique FR/AR)
+    help.js             Moteur du Centre d'aide (sommaire, recherche, F1, RTL)
+    help.css            Styles du Centre d'aide
     print-doc.css       Styles des documents : modèles, couleurs, densité, filigrane, RTL
     print-doc.js        Moteur de rendu unique des documents (facture OU devis)
     print-invoice.*     Entrée impression FACTURE (type + moteur partagé)
@@ -502,11 +522,15 @@ test/
                         nom du client figé dans Paramètres + logo de société inséré
                         sur les factures) puis Export comptable (paquet zip : journal, TVA,
                         encaissements, balance âgée, rapprochement, empreinte SHA-256) et
-                        Paramètres → Mises à jour (carte + IPC electron-updater)
+                        Paramètres → Mises à jour (carte + IPC electron-updater),
+                        puis Centre d'aide (contenu FR/AR, aide contextuelle, recherche, F1, RTL)
   unit/                 npm run test:unit : tests unitaires sans Electron (node:test)
                         export-pack (CSV/ODS/empreinte/déterminisme), i18n (parité FR/AR),
-                        words (montants en lettres), store (migrations), autobackup, updater
+                        words (montants en lettres), store (migrations), autobackup, updater,
+                        help (intégrité et parité du contenu d'aide)
   debug-pdf.js          node test/debug-pdf.js <fichier.pdf> → trace d'extraction
+docs/
+  plan-aide-utilisation.md  Plan éditorial du dispositif d'aide (contenu, vidéos, guide)
 .github/workflows/
   ci.yml                CI : syntaxe + tests unitaires + smoke complet (xvfb)
 ```

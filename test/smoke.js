@@ -203,7 +203,7 @@ ipcMain.handle('export:close-period', async (event, period) => {
   const pack = exportPack.buildPack(storeStub, {
     from: period && period.from,
     to: period && period.to,
-    appVersion: '1.18'
+    appVersion: '1.19'
   });
   const zipPath = path.join(__dirname, '.tmp', pack.base + '_cloture.zip');
   fs.writeFileSync(zipPath, exportPack.zipBuffer(pack.files));
@@ -211,7 +211,7 @@ ipcMain.handle('export:close-period', async (event, period) => {
 });
 
 /* Version de l'application (lue dans package.json par le vrai main.js) */
-ipcMain.handle('app:version', () => '1.18');
+ipcMain.handle('app:version', () => '1.19');
 
 function check(name, cond, detail) {
   if (cond) console.log('  ok   ' + name);
@@ -275,7 +275,7 @@ async function phaseUi() {
   check('logo posé sur fond blanc (lisibilité sur la sidebar bleue)',
     base.brandBg === 'rgb(255, 255, 255)', base.brandBg);
   check('favicon Icon.png déclaré', /Icon\.png/.test(base.favicon || ''), base.favicon);
-  check('version affichée dans la sidebar (v1.18)', base.version === 'v1.18', base.version);
+  check('version affichée dans la sidebar (v1.19)', base.version === 'v1.19', base.version);
   check('tableau de bord rempli', base.dashRendered);
   check('parseur CSV', !base.csvError && base.csv && base.csv.length === 3 &&
     base.csv[0].amount === 1200.5 && base.csv[1].amount === -25.5 && base.csv[2].amount === 34.99, base.csv || base.csvError);
@@ -2658,6 +2658,128 @@ async function phaseDocModel(win) {
   }
 }
 
+/* ---- PHASE 1h : CENTRE D'AIDE (v1.19) ----
+   Vérifie le chargement du contenu, les déclencheurs (bouton latéral + « ? »
+   par écran), l'aide contextuelle, la recherche, les renvois « Voir aussi »,
+   le raccourci F1, la fermeture par Échap et le rendu arabe (RTL). */
+async function phaseHelp(win) {
+  console.log('--- PHASE 1h : CENTRE D\'AIDE (v1.19) ---');
+
+  await win.loadFile(path.join(__dirname, '..', 'src', 'renderer', 'index.html'));
+  await wait(900);
+
+  const loaded = await ev(win, `(function () {
+    return {
+      hasContent: !!window.HELP,
+      hasUi: !!window.HELPUI,
+      articles: window.HELP ? Object.keys(window.HELP.articles).length : 0,
+      cats: window.HELP ? window.HELP.categories.length : 0,
+      screens: window.HELP ? window.HELP.SCREENS.length : 0
+    };
+  })()`);
+  check('aide : contenu et moteur chargés',
+    loaded.hasContent && loaded.hasUi && loaded.articles >= 40 && loaded.cats >= 5 && loaded.screens === 10, loaded);
+
+  const triggers = await ev(win, `(function () {
+    return {
+      side: !!document.querySelector('#btn-help'),
+      screenBtns: document.querySelectorAll('.help-screen-btn').length,
+      views: document.querySelectorAll('.view').length
+    };
+  })()`);
+  check('aide : bouton latéral présent', triggers.side === true, triggers);
+  check('aide : bouton « ? » sur chaque écran', triggers.screenBtns === 10, triggers);
+
+  await ev(win, `(function () {
+    showView('invoices');
+    document.querySelector('#view-invoices .help-screen-btn').click();
+    return true;
+  })()`);
+  await wait(120);
+  const opened = await ev(win, `(function () {
+    const h = document.querySelector('#help-article .help-h');
+    return {
+      open: !document.querySelector('#help-root').hidden,
+      ui: window.HELPUI.isOpen(),
+      title: h ? h.textContent : '',
+      focusInside: document.querySelector('#help-root').contains(document.activeElement)
+    };
+  })()`);
+  check('aide : aide contextuelle de l’écran « Factures validées »',
+    opened.open && opened.ui && opened.title === 'Les factures validées', opened);
+  check('aide : focus déplacé dans le panneau', opened.focusInside === true, opened);
+
+  const beforeRel = await ev(win, `(document.querySelector('#help-article .help-link') || {}).textContent || ''`);
+  await ev(win, `document.querySelector('#help-article .help-link').click(); true`);
+  await wait(80);
+  const afterRel = await ev(win, `(document.querySelector('#help-article .help-h') || {}).textContent || ''`);
+  check('aide : les renvois « Voir aussi » naviguent vers un autre article',
+    !!beforeRel && !!afterRel && afterRel !== opened.title, { beforeRel, afterRel });
+
+  await ev(win, `(function () {
+    const i = document.querySelector('#help-search');
+    i.value = 'facture';
+    i.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
+  })()`);
+  await wait(80);
+  const search = await ev(win, `(function () {
+    return {
+      shown: !document.querySelector('#help-results').hidden,
+      tocHidden: document.querySelector('#help-toc').hidden,
+      hits: document.querySelectorAll('#help-results .help-toc-link').length
+    };
+  })()`);
+  check('aide : la recherche filtre le sommaire', search.shown && search.tocHidden && search.hits >= 3, search);
+
+  await ev(win, `document.querySelector('#help-results .help-toc-link').click(); true`);
+  await wait(60);
+  const picked = await ev(win, `(document.querySelector('#help-article .help-h') || {}).textContent || ''`);
+  check('aide : un résultat ouvre l’article', !!picked, picked);
+
+  await ev(win, `(function () {
+    const i = document.querySelector('#help-search');
+    i.value = '';
+    i.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
+  })()`);
+  await wait(60);
+  const cleared = await ev(win, `(function () {
+    return { resultsHidden: document.querySelector('#help-results').hidden, tocShown: !document.querySelector('#help-toc').hidden };
+  })()`);
+  check('aide : effacer la recherche rétablit le sommaire', cleared.resultsHidden && cleared.tocShown, cleared);
+
+  await ev(win, `document.querySelector('#help-close').click(); true`);
+  await wait(60);
+  const closed = await ev(win, `window.HELPUI.isOpen()`);
+  check('aide : le bouton Fermer referme le panneau', closed === false, closed);
+
+  await ev(win, `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'F1', bubbles: true, cancelable: true })); true`);
+  await wait(60);
+  const f1 = await ev(win, `(function () {
+    return { open: window.HELPUI.isOpen(), title: (document.querySelector('#help-article .help-h') || {}).textContent || '' };
+  })()`);
+  check('aide : F1 ouvre l’aide de l’écran courant', f1.open && f1.title === 'Les factures validées', f1);
+
+  await ev(win, `document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })); true`);
+  await wait(60);
+  const esc = await ev(win, `window.HELPUI.isOpen()`);
+  check('aide : Échap referme le panneau', esc === false, esc);
+
+  await ev(win, `(function () { window.I18N.setLang('ar'); window.HELPUI.openContextual(); return true; })()`);
+  await wait(80);
+  const ar = await ev(win, `(function () {
+    return {
+      dir: document.documentElement.getAttribute('dir'),
+      title: (document.querySelector('#help-article .help-h') || {}).textContent || '',
+      heading: (document.querySelector('#help-title') || {}).textContent || ''
+    };
+  })()`);
+  check('aide : contenu arabe en lecture de droite à gauche',
+    ar.dir === 'rtl' && ar.title === 'الفواتير المؤكدة' && ar.heading === 'مركز المساعدة', ar);
+  await ev(win, `window.HELPUI.close(); window.I18N.setLang('fr'); true`);
+}
+
 (async function main() {
   try {
     await app.whenReady();
@@ -2676,6 +2798,7 @@ async function phaseDocModel(win) {
     await phaseQuotes(uiWin);
     await phaseComptabilisation(uiWin);
     await phaseDocModel(uiWin);
+    await phaseHelp(uiWin);
   } catch (e) {
     problems.push('exception: ' + (e && e.stack ? e.stack : e));
   }

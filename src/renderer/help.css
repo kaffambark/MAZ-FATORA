@@ -1,0 +1,166 @@
+/* MAZ-FATORA — styles du Centre d'aide (help.js).
+   Réutilise les jetons de styles.css (couleurs, rayons, ombres) et suit
+   automatiquement le thème clair/sombre ainsi que le sens RTL (arabe). */
+
+/* --- Boutons d'aide --- */
+.sidebar-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+.sidebar-actions .theme-btn { margin: 0; }
+
+.help-screen-btn { padding: 7px 9px; }
+.help-screen-btn .ic { width: 16px; height: 16px; }
+
+/* --- Superposition --- */
+.help-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 13, 26, .55);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 60;
+  padding: 24px;
+}
+.help-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  width: min(1040px, 100%);
+  height: min(88vh, 780px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+.help-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-2);
+}
+.help-head h2 { margin: 0; font-size: 17px; letter-spacing: -.2px; }
+.help-close {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.help-close:hover { background: var(--panel-hover); color: var(--text); }
+.help-close .ic { width: 16px; height: 16px; }
+
+.help-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(220px, 290px) 1fr;
+  min-height: 0;
+}
+
+/* --- Colonne sommaire / recherche --- */
+.help-nav {
+  border-inline-end: 1px solid var(--border);
+  background: var(--panel-2);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.help-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+}
+.help-search .ic { width: 15px; height: 15px; color: var(--muted); flex: none; }
+.help-search input {
+  border: none;
+  background: transparent;
+  outline: none;
+  width: 100%;
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+}
+.help-toc, .help-results { flex: 1; overflow-y: auto; padding: 0 8px 12px; }
+
+.help-cat { margin-top: 8px; }
+.help-cat-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--muted);
+  font-weight: 700;
+  padding: 6px 8px;
+}
+.help-cat-title .ic { width: 14px; height: 14px; }
+.help-toc ul, .help-results ul { list-style: none; margin: 0; padding: 0; }
+.help-toc-link {
+  display: block;
+  width: 100%;
+  text-align: start;
+  background: transparent;
+  border: none;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: var(--text-soft);
+  font-size: 13.5px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.help-toc-link:hover { background: var(--panel-hover); }
+.help-toc-link.active { background: var(--primary-soft); color: var(--primary-2); font-weight: 600; }
+
+/* --- Colonne article --- */
+.help-article { overflow-y: auto; padding: 22px 26px; outline: none; }
+.help-h { margin: 0 0 6px; font-size: 20px; letter-spacing: -.3px; }
+.help-goal { margin: 0 0 4px; font-size: 14.5px; color: var(--text-soft); line-height: 1.55; }
+.help-block { margin-top: 18px; }
+.help-block h4 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--muted);
+  font-weight: 700;
+}
+.help-block ul { margin: 0; padding-inline-start: 20px; }
+.help-block li { margin: 5px 0; font-size: 14px; line-height: 1.55; }
+.help-related { display: flex; flex-wrap: wrap; gap: 8px; }
+.help-link {
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--primary);
+  padding: 6px 11px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.help-link:hover { background: var(--primary-soft); }
+.help-article .muted { color: var(--muted); font-size: 14px; }
+
+@media (max-width: 720px) {
+  .help-backdrop { padding: 10px; }
+  .help-panel { height: 94vh; }
+  .help-body { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .help-nav { border-inline-end: none; border-bottom: 1px solid var(--border); max-height: 40%; }
+}
