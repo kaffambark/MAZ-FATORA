@@ -358,9 +358,122 @@ function assignNumber(inv) {
   state.meta.invoiceSeq = seq;
   const prefix = String(state.settings.invoicePrefix || 'FA').trim() || 'FA';
   inv.number = `${prefix}-${year}-${String(seq).padStart(4, '0')}`;
+  /* Séquence mémorisée sur la facture : permet d'identifier la « dernière »
+     (numéro le plus élevé) et de rembobiner le compteur à sa suppression. */
+  inv.seq = seq;
+  inv.seqYear = year;
   inv.status = 'validated';
   inv.validatedAt = new Date().toISOString();
   if (inv.transactionId) inv.paid = true;
+}
+
+/* Séquence d'une facture : champ `seq` (v1.16+), sinon extraite du numéro
+   FA-AAAA-NNNN pour les factures créées avant cette version. 0 = inconnue. */
+function invoiceSeqOf(inv) {
+  if (inv && Number(inv.seq)) return Number(inv.seq);
+  const m = /-(\d{3,})$/.exec(String((inv && inv.number) || ''));
+  return m ? Number(m[1]) : 0;
+}
+
+/* Dernière facture validée ? (aucune autre facture validée n'a une séquence
+   supérieure). Sert de verrou de suppression pour ne jamais créer de trou. */
+function isLastValidatedInvoice(inv) {
+  const seq = invoiceSeqOf(inv);
+  if (!seq) return false;
+  return !state.invoices.some((i) => i.status === 'validated' && i.id !== inv.id && invoiceSeqOf(i) > seq);
+}
+
+/* Verrou de suppression d'une facture : renvoie { ok, reason (clé i18n) }.
+   - brouillon : toujours supprimable ;
+   - facture validée : seulement la dernière, sans règlement et non comptabilisée. */
+function deleteInvoiceGuard(inv) {
+  if (!inv) return { ok: false, reason: 'common.notFound' };
+  if (inv.status !== 'validated') return { ok: true };
+  if (isAccounted(inv)) return { ok: false, reason: 'di.errAccounted' };
+  if (paymentList(inv).length) return { ok: false, reason: 'di.errPaid' };
+  if (!isLastValidatedInvoice(inv)) return { ok: false, reason: 'di.errNotLast' };
+  return { ok: true };
+}
+
+/* ---------------- Comptabilisation des factures (mois transmis) ----------------
+   Une facture « comptabilisée » (comptable) n'est plus modifiable ni supprimable ;
+   les encaissements restent possibles (évènement postérieur à la comptabilisation). */
+
+function isAccounted(inv) { return !!(inv && inv.accountedAt); }
+
+/* Mois de rattachement = année-mois de la date de facture (AAAA-MM). */
+function monthKeyOf(inv) { return String((inv && inv.issueDate) || '').slice(0, 7); }
+
+function pushAccountingLog(entry) {
+  if (!Array.isArray(state.meta.accountingLog)) state.meta.accountingLog = [];
+  state.meta.accountingLog.unshift(entry);
+  if (state.meta.accountingLog.length > 500) state.meta.accountingLog.length = 500;
+}
+
+/* Marque comme comptabilisées toutes les factures validées non comptabilisées
+   du mois (AAAA-MM). Réversible via unaccountPeriod(). */
+async function accountPeriod(period) {
+  const list = state.invoices.filter((i) => i.status === 'validated' && !isAccounted(i) && monthKeyOf(i) === period);
+  if (!list.length) { toast(tr('acc.none', { m: period }), 'error'); return false; }
+  if (!(await confirmBox(tr('acc.confirm', { m: period, n: list.length }), { okLabel: tr('acc.do') }))) return false;
+  const at = new Date().toISOString();
+  list.forEach((i) => { i.accountedAt = at; i.accountedPeriod = period; });
+  pushAccountingLog({ action: 'account', period, count: list.length, at });
+  await persist('invoices', 'meta');
+  renderAll();
+  toast(tr('acc.done', { n: list.length, m: period }), 'success');
+  return true;
+}
+
+/* Dé-comptabilise un mois (correction) : trace conservée dans le journal. */
+async function unaccountPeriod(period) {
+  const list = state.invoices.filter((i) => isAccounted(i) && i.accountedPeriod === period);
+  if (!list.length) { toast(tr('acc.noneAccounted', { m: period }), 'error'); return false; }
+  if (!(await confirmBox(tr('acc.unconfirm', { m: period, n: list.length }), { okLabel: tr('acc.undo'), okClass: 'danger' }))) return false;
+  const at = new Date().toISOString();
+  list.forEach((i) => { delete i.accountedAt; delete i.accountedPeriod; });
+  pushAccountingLog({ action: 'unaccount', period, count: list.length, at });
+  await persist('invoices', 'meta');
+  renderAll();
+  toast(tr('acc.undone', { n: list.length, m: period }), 'success');
+  return true;
+}
+
+/* Boîte de dialogue « Comptabiliser le mois… » (choix du mois + actions). */
+function openAccountPeriodModal(defPeriod) {
+  const months = state.invoices.filter((i) => i.status === 'validated').map(monthKeyOf).filter(Boolean).sort();
+  const def = defPeriod || months[months.length - 1] || todayISO().slice(0, 7);
+  openModal(`
+    <h2>${tr('acc.title')}</h2>
+    <p class="modal-sub">${tr('acc.sub')}</p>
+    <div class="form-grid">
+      <label>${tr('acc.month')} <input type="month" id="acc-month" value="${esc(def)}"></label>
+    </div>
+    <p class="hint" id="acc-info"></p>
+    <div class="modal-actions">
+      <button class="btn" id="acc-cancel">${tr('common.cancel')}</button>
+      <button class="btn danger" id="acc-unaccount">${tr('acc.undo')}</button>
+      <button class="btn primary" id="acc-do">${tr('acc.do')}</button>
+    </div>`);
+  function refresh() {
+    const m = $('#acc-month').value;
+    const todo = state.invoices.filter((i) => i.status === 'validated' && !isAccounted(i) && monthKeyOf(i) === m).length;
+    const done = state.invoices.filter((i) => isAccounted(i) && i.accountedPeriod === m).length;
+    $('#acc-info').textContent = tr('acc.info', { todo, done, m });
+    $('#acc-do').disabled = todo === 0;
+    $('#acc-unaccount').disabled = done === 0;
+  }
+  refresh();
+  $('#acc-month').addEventListener('change', refresh);
+  $('#acc-cancel').addEventListener('click', closeModal);
+  $('#acc-do').addEventListener('click', async () => {
+    const m = $('#acc-month').value;
+    if (m && await accountPeriod(m)) closeModal();
+  });
+  $('#acc-unaccount').addEventListener('click', async () => {
+    const m = $('#acc-month').value;
+    if (m && await unaccountPeriod(m)) closeModal();
+  });
 }
 
 /* Numérotation des DEVIS : séquence distincte (DV-AAAA-NNNN) — meta.quoteSeq
@@ -642,11 +755,27 @@ function renderDrafts() {
 
 function renderValidated() {
   const q = norm($('#inv-search').value);
+  const f = $('#inv-filter') ? $('#inv-filter').value : 'all';
   let list = state.invoices.filter((i) => i.status === 'validated');
+  if (f === 'accounted') list = list.filter(isAccounted);
+  else if (f === 'open') list = list.filter((i) => !isAccounted(i));
   if (q) list = list.filter((i) => norm(i.number + ' ' + clientNameOf(i)).includes(q));
   list.sort((a, b) => String(b.number || '').localeCompare(String(a.number || '')));
 
-  const rows = list.map((inv) => `
+  const rows = list.map((inv) => {
+    const accounted = isAccounted(inv);
+    const guard = deleteInvoiceGuard(inv);
+    /* Une facture comptabilisée n'est plus modifiable ni supprimable (encaissements
+       toujours possibles). Le verrou explique la raison dans son infobulle. */
+    const editBtn = accounted
+      ? `<button class="btn small" data-action="noop" disabled title="${esc(tr('inv.lockedEdit'))}">🔒 ${tr('common.open')}</button>`
+      : `<button class="btn small" data-action="edit-invoice" data-id="${inv.id}">${tr('common.open')}</button>`;
+    const delBtn = accounted
+      ? `<button class="btn small" data-action="noop" disabled title="${esc(tr('di.errAccounted'))}">🔒</button>`
+      : guard.ok
+        ? `<button class="btn small danger" data-action="delete-invoice" data-id="${inv.id}">${tr('common.delete')}</button>`
+        : `<button class="btn small" data-action="noop" disabled title="${esc(tr(guard.reason))}">🔒</button>`;
+    return `
     <tr>
       <td><strong>${esc(inv.number)}</strong></td>
       <td>${esc(clientNameOf(inv))}</td>
@@ -654,19 +783,22 @@ function renderValidated() {
       <td>${dateFR(inv.dueDate)}</td>
       <td class="num"><strong>${money(totals(inv).ttc)}</strong></td>
       <td>${payPill(inv)}<div class="muted small">${tr('inv.paidOf', { p: money(paidAmount(inv)), r: money(restDue(inv)) })}</div></td>
+      <td>${accounted ? `<span class="pill blue" title="${esc(tr('inv.accountedOn', { d: dateFR(String(inv.accountedAt).slice(0, 10)) }))}">${tr('inv.accounted')}</span>` : ''}</td>
       <td>
         <div class="row-actions">
+          ${editBtn}
           <button class="btn small" data-action="preview-invoice" data-id="${inv.id}">${tr('common.preview')}</button>
           <button class="btn small" data-action="pdf-invoice" data-id="${inv.id}">PDF</button>
           <button class="btn small" data-action="pay-invoice" data-id="${inv.id}">${isPaid(inv) ? tr('pay.history') : tr('pay.action')}</button>
-          <button class="btn small danger" data-action="delete-invoice" data-id="${inv.id}">${tr('common.delete')}</button>
+          ${delBtn}
         </div>
       </td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 
   $('#inv-table').innerHTML = `
-    <thead><tr><th>${tr('inv.number')}</th><th>${tr('common.client')}</th><th>${tr('common.date')}</th><th>${tr('common.due')}</th><th class="num">${tr('common.total')}</th><th>${tr('inv.reglement')}</th><th></th></tr></thead>
-    <tbody>${rows || `<tr><td colspan="7" class="empty">${tr('inv.empty')}</td></tr>`}</tbody>`;
+    <thead><tr><th>${tr('inv.number')}</th><th>${tr('common.client')}</th><th>${tr('common.date')}</th><th>${tr('common.due')}</th><th class="num">${tr('common.total')}</th><th>${tr('inv.reglement')}</th><th>${tr('inv.accountedCol')}</th><th></th></tr></thead>
+    <tbody>${rows || `<tr><td colspan="8" class="empty">${tr('inv.empty')}</td></tr>`}</tbody>`;
 }
 
 /* ---------------- Devis (vue) ---------------- */
@@ -1111,6 +1243,8 @@ function openInvoiceEditor(id) {
   const existing = id ? invoiceById(id) : null;
   /* id fourni mais introuvable : on n'ouvre PAS un éditeur vide (facture « disparue ») */
   if (id && !existing) { toast(tr('common.notFound'), 'error'); return; }
+  /* Facture comptabilisée : édition bloquée (le mois est transmis au comptable). */
+  if (existing && isAccounted(existing)) { toast(tr('inv.lockedEdit'), 'error'); return; }
   const draft = existing
     ? JSON.parse(JSON.stringify(existing))
     : {
@@ -1276,6 +1410,8 @@ function openInvoiceEditor(id) {
   $('#ie-cancel').addEventListener('click', closeModal);
 
   async function save(validate) {
+    /* Garde défensive : une facture comptabilisée ne doit jamais être modifiée. */
+    if (draft.id && isAccounted(invoiceById(draft.id))) { toast(tr('inv.lockedEdit'), 'error'); return; }
     draft.clientId = $('#ie-client').value || null;
     draft.issueDate = $('#ie-issue').value || todayISO();
     draft.dueDate = $('#ie-due').value || addDays(draft.issueDate, paymentDelay());
@@ -1324,15 +1460,24 @@ async function validateInvoice(id) {
 async function deleteInvoice(id) {
   const inv = invoiceById(id);
   if (!inv) return;
+  /* Verrou de numérotation : on ne supprime qu'une facture validée qui est la
+     dernière (sinon un trou apparaîtrait), sans règlement et non comptabilisée. */
+  const guard = deleteInvoiceGuard(inv);
+  if (!guard.ok) { toast(tr(guard.reason), 'error'); return; }
   const label = inv.number || tr('common.draft');
   if (!(await confirmBox(tr('di.confirm', { label }), { okLabel: tr('common.delete'), okClass: 'danger' }))) return;
+  /* Rembobinage du compteur : le numéro supprimé est réutilisé (série contiguë). */
+  if (inv.status === 'validated') {
+    const start = Math.max(1, Math.floor(Number(state.settings.invoiceStart) || 1));
+    state.meta.invoiceSeq = Math.max(start - 1, invoiceSeqOf(inv) - 1);
+  }
   const txnIds = [inv.transactionId, ...(inv.transactionIds || [])].filter(Boolean);
   for (const tid of txnIds) {
     const tx = txById(tid);
     if (tx && tx.linkedInvoiceId === inv.id) tx.linkedInvoiceId = null;
   }
   state.invoices = state.invoices.filter((i) => i.id !== id);
-  await persist('invoices', 'transactions');
+  await persist('invoices', 'transactions', 'meta');
   renderAll();
   closeModal();
   toast(tr('di.done'));
@@ -2906,6 +3051,8 @@ $$('#import-from, #import-to').forEach((el) => el.addEventListener('change', () 
 $('#tx-search').addEventListener('input', renderTransactions);
 $('#tx-filter').addEventListener('change', renderTransactions);
 $('#inv-search').addEventListener('input', renderValidated);
+$('#inv-filter').addEventListener('change', renderValidated);
+$('#btn-account-month').addEventListener('click', () => openAccountPeriodModal());
 $('#pay-search').addEventListener('input', renderPayments);
 $('#pay-filter').addEventListener('change', renderPayments);
 
@@ -3093,6 +3240,12 @@ $('#btn-export-close-period').addEventListener('click', async () => {
   const msg = $('#close-export-msg');
   if (msg) msg.textContent = tr('set.closeDone', { n: res.nFiles, p: res.path });
   toast(tr('set.closeToast'), 'success');
+  /* Le mois transmis peut être marqué « comptabilisé » : on propose le dernier
+     mois de la période exportée qui contient encore des factures non comptabilisées. */
+  const inRange = state.invoices
+    .filter((i) => i.status === 'validated' && !isAccounted(i) && i.issueDate >= from && i.issueDate <= to)
+    .map(monthKeyOf).filter(Boolean).sort();
+  if (inRange.length) openAccountPeriodModal(inRange[inRange.length - 1]);
 });
 
 /* ---------------- Démarrage ---------------- */

@@ -175,6 +175,28 @@ const I18N_DICT = {
     'inv.empty': 'Aucune facture validée.',
     'inv.pdfSaved': 'PDF enregistré : {path}',
     'inv.markedPaid': 'Facture marquée payée.',
+    'inv.filterAll': 'Toutes',
+    'inv.filterOpen': 'Non comptabilisées',
+    'inv.filterAccounted': 'Comptabilisées',
+    'inv.accounted': 'Comptabilisée',
+    'inv.accountedCol': 'Comptabilité',
+    'inv.accountedOn': 'Comptabilisée le {d}',
+    'inv.lockedEdit': 'Facture comptabilisée : édition impossible (dé-comptabilisez le mois pour la corriger).',
+
+    /* --- comptabilisation des factures (mois transmis au comptable) --- */
+    'acc.button': 'Comptabiliser le mois…',
+    'acc.title': 'Comptabilisation du mois',
+    'acc.sub': 'Marque toutes les factures validées d\'un mois comme transmises au comptable : elles ne sont plus modifiables ni supprimables (les encaissements restent possibles). Action réversible et tracée.',
+    'acc.month': 'Mois',
+    'acc.info': '{todo} facture(s) à comptabiliser · {done} déjà comptabilisée(s) pour {m}',
+    'acc.do': 'Comptabiliser',
+    'acc.undo': 'Dé-comptabiliser',
+    'acc.confirm': 'Comptabiliser {n} facture(s) du mois {m} ?',
+    'acc.unconfirm': 'Dé-comptabiliser {n} facture(s) du mois {m} ?',
+    'acc.done': '{n} facture(s) du mois {m} comptabilisée(s).',
+    'acc.undone': '{n} facture(s) du mois {m} dé-comptabilisée(s).',
+    'acc.none': 'Aucune facture validée à comptabiliser pour {m}.',
+    'acc.noneAccounted': 'Aucune facture comptabilisée pour {m}.',
 
     /* --- clients --- */
     'cl.title': 'Clients',
@@ -268,6 +290,9 @@ const I18N_DICT = {
     'vi.confirm': 'Valider la facture de {client} ({total}) ?\nUn numéro définitif lui sera attribué.',
     'di.confirm': 'Supprimer la facture {label} ?',
     'di.done': 'Facture supprimée.',
+    'di.errAccounted': 'Facture comptabilisée : suppression impossible (dé-comptabilisez le mois d\'abord).',
+    'di.errPaid': 'Facture réglée : supprimez d\'abord ses règlements.',
+    'di.errNotLast': 'Seule la dernière facture de la série peut être supprimée (numérotation continue).',
 
     /* --- génération par période --- */
     'gen.noCandidates': "Aucun encaissement en attente de facturation. Importez d'abord un relevé bancaire.",
@@ -777,6 +802,28 @@ const I18N_DICT = {
     'inv.empty': 'لا توجد فواتير معتمدة.',
     'inv.pdfSaved': 'تم حفظ PDF : {path}',
     'inv.markedPaid': 'تم وضع علامة مدفوع على الفاتورة.',
+    'inv.filterAll': 'الكل',
+    'inv.filterOpen': 'غير محاسبية',
+    'inv.filterAccounted': 'محاسبية',
+    'inv.accounted': 'محاسبية',
+    'inv.accountedCol': 'المحاسبة',
+    'inv.accountedOn': 'تمت المحاسبة في {d}',
+    'inv.lockedEdit': 'فاتورة محاسبية: التعديل غير ممكن (ألغِ محاسبة الشهر لتصحيحها).',
+
+    /* --- comptabilisation des factures (mois transmis au comptable) --- */
+    'acc.button': 'محاسبة الشهر…',
+    'acc.title': 'محاسبة الشهر',
+    'acc.sub': 'يضع علامة « مُرسلة إلى المحاسب » على جميع الفواتير المعتمدة لشهر معيّن: تصبح غير قابلة للتعديل أو الحذف (يبقى تسجيل الأداءات ممكنًا). الإجراء قابل للتراجع ومُوثَّق.',
+    'acc.month': 'الشهر',
+    'acc.info': '{todo} فاتورة للمحاسبة · {done} محاسبية بالفعل لشهر {m}',
+    'acc.do': 'محاسبة',
+    'acc.undo': 'إلغاء المحاسبة',
+    'acc.confirm': 'محاسبة {n} فاتورة لشهر {m}؟',
+    'acc.unconfirm': 'إلغاء محاسبة {n} فاتورة لشهر {m}؟',
+    'acc.done': 'تمت محاسبة {n} فاتورة لشهر {m}.',
+    'acc.undone': 'تم إلغاء محاسبة {n} فاتورة لشهر {m}.',
+    'acc.none': 'لا توجد فاتورة معتمدة للمحاسبة في {m}.',
+    'acc.noneAccounted': 'لا توجد فاتورة محاسبية في {m}.',
 
     /* --- clients --- */
     'cl.title': 'العملاء',
@@ -870,6 +917,9 @@ const I18N_DICT = {
     'vi.confirm': 'اعتماد فاتورة {client} ({total}) ؟\nسيُسنَّد لها رقم نهائي.',
     'di.confirm': 'حذف الفاتورة {label} ؟',
     'di.done': 'تم حذف الفاتورة.',
+    'di.errAccounted': 'فاتورة محاسبية: الحذف غير ممكن (ألغِ محاسبة الشهر أولًا).',
+    'di.errPaid': 'فاتورة مسدَّدة: احذف أداءاتها أولًا.',
+    'di.errNotLast': 'يمكن حذف آخر فاتورة في السلسلة فقط (ترقيم متواصل).',
 
     /* --- génération par période --- */
     'gen.noCandidates': 'لا توجد مقبوضات بانتظار الفوترة. استورد كشفاً بنكياً أولاً.',

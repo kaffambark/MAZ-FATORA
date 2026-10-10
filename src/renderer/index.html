@@ -324,6 +324,14 @@
           <h1 data-i18n="inv.title">Factures validées</h1>
           <div class="actions">
             <input type="search" id="inv-search" data-i18n-ph="inv.search" placeholder="Rechercher…">
+            <select id="inv-filter">
+              <option value="all" data-i18n="inv.filterAll">Toutes</option>
+              <option value="open" data-i18n="inv.filterOpen">Non comptabilisées</option>
+              <option value="accounted" data-i18n="inv.filterAccounted">Comptabilisées</option>
+            </select>
+            <button class="btn" id="btn-account-month">
+              <svg class="ic"><use href="#i-check"/></svg><span data-i18n="acc.button">Comptabiliser le mois…</span>
+            </button>
             <button class="btn primary" id="btn-new-invoice-inv">
               <svg class="ic"><use href="#i-plus"/></svg><span data-i18n="drafts.new">Nouvelle facture</span>
             </button>

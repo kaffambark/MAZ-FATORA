@@ -203,7 +203,7 @@ ipcMain.handle('export:close-period', async (event, period) => {
   const pack = exportPack.buildPack(storeStub, {
     from: period && period.from,
     to: period && period.to,
-    appVersion: '1.15'
+    appVersion: '1.16'
   });
   const zipPath = path.join(__dirname, '.tmp', pack.base + '_cloture.zip');
   fs.writeFileSync(zipPath, exportPack.zipBuffer(pack.files));
@@ -211,7 +211,7 @@ ipcMain.handle('export:close-period', async (event, period) => {
 });
 
 /* Version de l'application (lue dans package.json par le vrai main.js) */
-ipcMain.handle('app:version', () => '1.15');
+ipcMain.handle('app:version', () => '1.16');
 
 function check(name, cond, detail) {
   if (cond) console.log('  ok   ' + name);
@@ -275,7 +275,7 @@ async function phaseUi() {
   check('logo posé sur fond blanc (lisibilité sur la sidebar bleue)',
     base.brandBg === 'rgb(255, 255, 255)', base.brandBg);
   check('favicon Icon.png déclaré', /Icon\.png/.test(base.favicon || ''), base.favicon);
-  check('version affichée dans la sidebar (v1.15)', base.version === 'v1.15', base.version);
+  check('version affichée dans la sidebar (v1.16)', base.version === 'v1.16', base.version);
   check('tableau de bord rempli', base.dashRendered);
   check('parseur CSV', !base.csvError && base.csv && base.csv.length === 3 &&
     base.csv[0].amount === 1200.5 && base.csv[1].amount === -25.5 && base.csv[2].amount === 34.99, base.csv || base.csvError);
@@ -2379,6 +2379,156 @@ async function phaseQuotes(win) {
       seqF: persisted2.meta.invoiceSeq, inv: persisted2.invoices.length });
 }
 
+/* ---- PHASE 1f : comptabilisation des factures (v1.16) ----
+   Suppression réservée à la dernière facture (numérotation continue sans trou),
+   verrou de suppression (règlement / comptabilisée), état « comptabilisée » par
+   mois, édition bloquée, encaissements toujours possibles, réversibilité tracée. */
+async function phaseComptabilisation(win) {
+  console.log('--- PHASE 1f : COMPTABILISATION DES FACTURES (v1.16) ---');
+
+  await win.loadFile(path.join(__dirname, '..', 'src', 'renderer', 'index.html'));
+  await wait(900);
+
+  /* Scénario déterministe : 3 factures validées FA-2026-0001..0003 (octobre). */
+  await ev(win, `(async function () {
+    const mk = function (seq, date) {
+      return { id: 'acc-' + seq, status: 'validated', number: 'FA-2026-' + String(seq).padStart(4, '0'),
+        seq: seq, seqYear: '2026', issueDate: date, dueDate: '2026-11-04', clientId: 'c1', clientName: 'Dupont SARL',
+        lines: [{ desc: 'Prestation', qty: 1, price: 100, tva: 20 }], payments: [], notes: '',
+        createdAt: date + 'T10:00:00.000Z', validatedAt: date + 'T10:00:00.000Z' };
+    };
+    state.invoices = [ mk(1, '2026-10-05'), mk(2, '2026-10-06'), mk(3, '2026-10-07') ];
+    state.settings.invoiceStart = 1;
+    state.meta.invoiceSeq = 3;
+    renderAll();
+    await persist('invoices', 'meta', 'settings');
+    return state.invoices.length;
+  })()`);
+
+  /* a) suppression refusée pour une facture non-dernière (pas de trou) */
+  const a = await ev(win, `(async function () {
+    const before = state.invoices.length;
+    await deleteInvoice('acc-1');
+    return { before: before, after: state.invoices.length, seq: state.meta.invoiceSeq };
+  })()`);
+  check('comptabilisation — suppression refusée pour une facture non-dernière',
+    a.before === 3 && a.after === 3 && a.seq === 3, a);
+
+  /* b) suppression refusée si la dernière porte un règlement */
+  const b = await ev(win, `(async function () {
+    invoiceById('acc-3').payments = [{ id: 'p1', date: '2026-10-09', amount: 120, method: 'virement' }];
+    const before = state.invoices.length;
+    await deleteInvoice('acc-3');
+    return { before: before, after: state.invoices.length, seq: state.meta.invoiceSeq };
+  })()`);
+  check('comptabilisation — suppression refusée si la dernière a un règlement',
+    b.before === 3 && b.after === 3 && b.seq === 3, b);
+
+  /* c) dernière facture (sans règlement) supprimable : compteur rembobiné 3 → 2 */
+  const c = await ev(win, `(async function () {
+    invoiceById('acc-3').payments = [];
+    const p = deleteInvoice('acc-3');
+    await new Promise(function (r) { setTimeout(r, 80); });
+    if (document.querySelector('#cf-ok')) document.querySelector('#cf-ok').click();
+    await p;
+    return { n: state.invoices.length, seq: state.meta.invoiceSeq, gone: !invoiceById('acc-3') };
+  })()`);
+  check('comptabilisation — dernière facture supprimée et compteur rembobiné (3 → 2)',
+    c.n === 2 && c.seq === 2 && c.gone, c);
+
+  /* d) le numéro libéré est réutilisé (série contiguë) */
+  await ev(win, `(function () {
+    openInvoiceEditor(null);
+    const set = function (sel, v) { const el = document.querySelector(sel); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
+    const cs = document.querySelector('#ie-client'); cs.value = state.clients[0].id; cs.dispatchEvent(new Event('change', { bubbles: true }));
+    set('#ie-lines input[data-f="desc"]', 'Réutilisation du numéro');
+    set('#ie-lines input[data-f="price"]', '100');
+    document.querySelector('#ie-validate').click();
+    return true;
+  })()`);
+  await wait(450);
+  const d = await ev(win, `(function () {
+    const nums = state.invoices.filter(function (i) { return i.status === 'validated'; }).map(function (i) { return i.number; }).sort();
+    return { seq: state.meta.invoiceSeq, last: nums[nums.length - 1], n: state.invoices.length };
+  })()`);
+  check('comptabilisation — numéro réutilisé après suppression de la dernière (FA-2026-0003)',
+    d.seq === 3 && d.n === 3 && /FA-2026-0003/.test(d.last), d);
+
+  /* e) comptabilisation du mois (3 factures) + journal */
+  const e = await ev(win, `(async function () {
+    const p = accountPeriod('2026-10');
+    await new Promise(function (r) { setTimeout(r, 80); });
+    if (document.querySelector('#cf-ok')) document.querySelector('#cf-ok').click();
+    await p;
+    return { n: state.invoices.filter(function (i) { return !!i.accountedAt; }).length,
+             period: state.invoices[0].accountedPeriod,
+             log: (state.meta.accountingLog || []).length };
+  })()`);
+  check('comptabilisation — mois 2026-10 marqué comptabilisé (3 factures) + journal',
+    e.n === 3 && e.period === '2026-10' && e.log === 1, e);
+
+  /* f) suppression refusée pour une facture comptabilisée (même la dernière) */
+  const f = await ev(win, `(async function () {
+    const inv = state.invoices.filter(function (i) { return i.status === 'validated'; })
+      .sort(function (x, y) { return invoiceSeqOf(x) - invoiceSeqOf(y); }).pop();
+    const before = state.invoices.length;
+    await deleteInvoice(inv.id);
+    return { before: before, after: state.invoices.length, accounted: isAccounted(inv) };
+  })()`);
+  check('comptabilisation — suppression refusée pour une facture comptabilisée',
+    f.before === 3 && f.after === 3 && f.accounted, f);
+
+  /* g) édition refusée pour une facture comptabilisée */
+  const g = await ev(win, `(function () {
+    closeModal();
+    const acc = state.invoices.filter(function (i) { return isAccounted(i); })[0];
+    openInvoiceEditor(acc.id);
+    return { hidden: document.querySelector('#modal-root').hidden };
+  })()`);
+  check('comptabilisation — édition refusée pour une facture comptabilisée', g.hidden === true, g);
+
+  /* h) encaissement toujours possible, édition retirée dans la liste */
+  const h = await ev(win, `(async function () {
+    showView('invoices');
+    renderValidated();
+    const acc = state.invoices.filter(function (i) { return isAccounted(i); })[0];
+    const pay = document.querySelector('#inv-table [data-action="pay-invoice"][data-id="' + acc.id + '"]');
+    const edit = document.querySelector('#inv-table [data-action="edit-invoice"][data-id="' + acc.id + '"]');
+    const badge = /Comptabilisée/.test(document.querySelector('#inv-table').textContent);
+    return { pay: !!pay, edit: !!edit, badge: badge };
+  })()`);
+  check('comptabilisation — encaissement possible, édition retirée, pastille visible',
+    h.pay && !h.edit && h.badge, h);
+
+  /* i) dé-comptabilisation réversible (journal conservé) */
+  const i = await ev(win, `(async function () {
+    const p = unaccountPeriod('2026-10');
+    await new Promise(function (r) { setTimeout(r, 80); });
+    if (document.querySelector('#cf-ok')) document.querySelector('#cf-ok').click();
+    await p;
+    return { still: state.invoices.filter(function (x) { return isAccounted(x); }).length,
+             log: (state.meta.accountingLog || []).length,
+             canDelete: deleteInvoiceGuard(state.invoices[state.invoices.length - 1]).ok };
+  })()`);
+  check('comptabilisation — dé-comptabilisation réversible (journal tracé, suppression à nouveau possible)',
+    i.still === 0 && i.log === 2 && i.canDelete, i);
+
+  /* j) persistance : accountedAt + journal dans la base stub */
+  await ev(win, `(async function () {
+    const p = accountPeriod('2026-10');
+    await new Promise(function (r) { setTimeout(r, 80); });
+    if (document.querySelector('#cf-ok')) document.querySelector('#cf-ok').click();
+    await p;
+    return true;
+  })()`);
+  const persisted = await ev(win, `window.factapi.storeGet()`);
+  check('comptabilisation — persistée (accountedAt + journal dans meta)',
+    persisted.invoices.filter(function (x) { return x.accountedAt; }).length === 3 &&
+    Array.isArray(persisted.meta.accountingLog) && persisted.meta.accountingLog.length >= 3,
+    { acc: persisted.invoices.filter(function (x) { return x.accountedAt; }).length,
+      log: persisted.meta.accountingLog && persisted.meta.accountingLog.length });
+}
+
 (async function main() {
   try {
     await app.whenReady();
@@ -2395,6 +2545,7 @@ async function phaseQuotes(win) {
     await phaseLicence(uiWin);
     await phaseExportPack(uiWin);
     await phaseQuotes(uiWin);
+    await phaseComptabilisation(uiWin);
   } catch (e) {
     problems.push('exception: ' + (e && e.stack ? e.stack : e));
   }

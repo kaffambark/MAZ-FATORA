@@ -47,10 +47,31 @@ npm test
 
 ## Version
 
-La **version** s'affiche en bas de la barre latérale (ex. `v1.15`). À **chaque modification** du
+La **version** s'affiche en bas de la barre latérale (ex. `v1.16`). À **chaque modification** du
 projet, le champ `version` de `package.json` est incrémenté par la **partie mineure**
 (`1.0` → `1.1` → `1.2` …) et l'application affiche `major.minor`. Les noms d'installateurs
-reprennent la version complète (`1.15.0`).
+reprennent la version complète (`1.16.0`).
+
+## v1.16 — Comptabilisation des factures (numérotation continue)
+
+Garde-fous de **suppression** et **état « Comptabilisée »** pour préserver la séquence
+légale des factures (aucun trou) et tracer ce qui a été transmis au comptable :
+
+- **Suppression réservée à la dernière facture** : on ne peut supprimer qu'une facture
+  validée qui est la **dernière de la série** (numéro le plus élevé). Le compteur
+  `meta.invoiceSeq` est **rembobiné** en conséquence : le numéro libéré est **réutilisé**,
+  la numérotation reste **contiguë** ;
+- **Verrous de suppression** : refusée si la facture porte un **règlement** (supprimer
+  d'abord les règlements) ou si elle est **comptabilisée** ;
+- **État « Comptabilisée »** : toutes les factures validées d'un **mois** (année-mois de la
+  date de facture) peuvent être marquées comme transmises au comptable — **bouton
+  « Comptabiliser le mois… »** dans la vue Factures validées, et **proposition
+  automatique** après un export de clôture de période. Une facture comptabilisée n'est
+  plus **modifiable** ni **supprimable**, mais les **encaissements restent possibles**
+  (évènement postérieur à la comptabilisation) ;
+- **Réversible et tracé** : « Dé-comptabiliser le mois » avec confirmation, journal
+  d'audit conservé dans `meta.accountingLog` ;
+- **Filtre** Toutes / Non comptabilisées / Comptabilisées + pastille « Comptabilisée ».
 
 ## v1.15 — Devis transformables en factures
 
