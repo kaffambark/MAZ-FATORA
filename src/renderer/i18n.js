@@ -529,6 +529,11 @@ const I18N_DICT = {
     'paym.delete': 'Supprimer ce paiement',
     'paym.delConfirm': 'Supprimer le règlement de {v} du {d} ?',
     'paym.deleted': 'Règlement supprimé.',
+    'paym.edit': 'Modifier ce paiement',
+    'paym.editTitle': 'Modifier le paiement',
+    'paym.saveEdit': 'Enregistrer les modifications',
+    'paym.edited': 'Paiement modifié.',
+    'paym.errOverEdit': 'Le montant {v} dépasse le maximum possible ({r}).',
 
     /* --- sauvegarde / restauration de la base --- */
     'set.backup': 'Sauvegarde & restauration',
@@ -1307,6 +1312,11 @@ const I18N_DICT = {
     'paym.delete': 'حذف هذه الدفعة',
     'paym.delConfirm': 'حذف دفعة {v} المؤرخة {d} ؟',
     'paym.deleted': 'تم حذف الدفعة.',
+    'paym.edit': 'تعديل هذه الدفعة',
+    'paym.editTitle': 'تعديل الدفعة',
+    'paym.saveEdit': 'حفظ التعديلات',
+    'paym.edited': 'تم تعديل الدفعة.',
+    'paym.errOverEdit': 'المبلغ {v} يتجاوز الحد الأقصى الممكن ({r}).',
 
     /* --- sauvegarde / restauration de la base --- */
     'set.backup': 'النسخ الاحتياطي والاستعادة',

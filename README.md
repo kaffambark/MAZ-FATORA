@@ -47,10 +47,23 @@ npm test
 
 ## Version
 
-La **version** s'affiche en bas de la barre latérale (ex. `v1.21`). À **chaque modification** du
+La **version** s'affiche en bas de la barre latérale (ex. `v1.22`). À **chaque modification** du
 projet, le champ `version` de `package.json` est incrémenté par la **partie mineure**
 (`1.0` → `1.1` → `1.2` …) et l'application affiche `major.minor`. Les noms d'installateurs
-reprennent la version complète (`1.21.0`).
+reprennent la version complète (`1.22.0`).
+
+## v1.22 — Modifier un paiement (facture validée)
+
+Dans l'historique des règlements d'une facture (facture validée → **« Régler »** / **« Historique »**,
+ou écran **Paiements**), chaque paiement dispose désormais de deux actions :
+
+- **✎ modifier** : rouvre le formulaire **pré-rempli** (montant, date, mode, référence, note) ;
+  le montant ne peut pas dépasser le **total encaissable** (reste dû + ancien montant) ;
+- **✕ supprimer** : comme auparavant (avec confirmation).
+
+La fiche de la facture est **rouverte automatiquement** après l'opération, le reste dû et le
+statut (partielle / payée) sont recalculés et persistés. Sur une facture **comptabilisée**,
+la modification d'un paiement est bloquée (comme l'édition de la facture).
 
 ## v1.21 — Guide d'utilisation imprimable (bilingue, PDF)
 

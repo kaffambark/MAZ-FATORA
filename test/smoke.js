@@ -204,7 +204,7 @@ ipcMain.handle('export:close-period', async (event, period) => {
   const pack = exportPack.buildPack(storeStub, {
     from: period && period.from,
     to: period && period.to,
-    appVersion: '1.21'
+    appVersion: '1.22'
   });
   const zipPath = path.join(__dirname, '.tmp', pack.base + '_cloture.zip');
   fs.writeFileSync(zipPath, exportPack.zipBuffer(pack.files));
@@ -212,7 +212,7 @@ ipcMain.handle('export:close-period', async (event, period) => {
 });
 
 /* Version de l'application (lue dans package.json par le vrai main.js) */
-ipcMain.handle('app:version', () => '1.21');
+ipcMain.handle('app:version', () => '1.22');
 
 function check(name, cond, detail) {
   if (cond) console.log('  ok   ' + name);
@@ -276,7 +276,7 @@ async function phaseUi() {
   check('logo posé sur fond blanc (lisibilité sur la sidebar bleue)',
     base.brandBg === 'rgb(255, 255, 255)', base.brandBg);
   check('favicon Icon.png déclaré', /Icon\.png/.test(base.favicon || ''), base.favicon);
-  check('version affichée dans la sidebar (v1.21)', base.version === 'v1.21', base.version);
+  check('version affichée dans la sidebar (v1.22)', base.version === 'v1.22', base.version);
   check('tableau de bord rempli', base.dashRendered);
   check('parseur CSV', !base.csvError && base.csv && base.csv.length === 3 &&
     base.csv[0].amount === 1200.5 && base.csv[1].amount === -25.5 && base.csv[2].amount === 34.99, base.csv || base.csvError);
@@ -826,6 +826,75 @@ async function phaseExtras(win) {
   check('modale rouverte sur la facture concernée',
     /Enregistrer un paiement/.test(del3.modalTitle), del3.modalTitle);
   await ev(win, `closeModal(); true`);
+
+  /* --- F-bis. modification d'un paiement existant --- */
+  const editOpen = await ev(win, `(function () {
+    const inv = state.invoices.filter(function (i) { return i.status === 'validated'; })[0];
+    openPaymentModal(inv.id);
+    const btn = document.querySelector('#pay-history [data-action="pay-edit"]');
+    const hasDelete = !!document.querySelector('#pay-history [data-action="pay-delete"]');
+    if (btn) btn.click();
+    return {
+      hasEdit: !!btn,
+      hasDelete: hasDelete,
+      payId: btn ? btn.getAttribute('data-pay') : '',
+      invPayId: inv.payments[0].id,
+      title: (document.querySelector('#modal-box h2') || {}).textContent || '',
+      amount: (document.querySelector('#pay-amount') || {}).value || ''
+    };
+  })()`);
+  check('paiement : bouton « modifier » dans l’historique',
+    editOpen.hasEdit && editOpen.hasDelete && editOpen.payId === editOpen.invPayId, editOpen);
+  check('paiement : formulaire de modification pré-rempli',
+    /Modifier le paiement/.test(editOpen.title) && editOpen.amount === '700.00', editOpen);
+
+  const editOver = await ev(win, `(function () {
+    document.querySelector('#pay-amount').value = '99999';
+    document.querySelector('#pay-save').click();
+    const inv = state.invoices.filter(function (i) { return i.status === 'validated'; })[0];
+    return {
+      amount: inv.payments[0].amount,
+      toast: document.querySelector('#toast').textContent,
+      hidden: document.querySelector('#modal-root').hidden
+    };
+  })()`);
+  check('paiement : modification refusée au-delà du maximum encaissable',
+    editOver.amount === 700 && /dépasse/.test(editOver.toast) && !editOver.hidden, editOver);
+
+  await ev(win, `(function () {
+    document.querySelector('#pay-amount').value = '300';
+    document.querySelector('#pay-method').value = 'cash';
+    document.querySelector('#pay-save').click();
+    return true;
+  })()`);
+  await wait(400);
+
+  const edited = await ev(win, `(function () {
+    const inv = state.invoices.filter(function (i) { return i.status === 'validated'; })[0];
+    return {
+      n: inv.payments.length,
+      amount: inv.payments[0].amount,
+      method: inv.payments[0].method,
+      paid: paidAmount(inv),
+      rest: restDue(inv),
+      status: payStatus(inv),
+      toast: document.querySelector('#toast').textContent,
+      modalTitle: (document.querySelector('#modal-box h2') || {}).textContent || ''
+    };
+  })()`);
+  check('paiement modifié (300,00 / reste 900,00), sans doublon',
+    edited.n === 1 && edited.amount === 300 && edited.method === 'cash' &&
+    edited.paid === 300 && edited.rest === 900 && edited.status === 'partial', edited);
+  check('toast « paiement modifié »', /modifié/i.test(edited.toast), edited.toast);
+  check('retour à la fiche de paiement après modification',
+    /Enregistrer un paiement/.test(edited.modalTitle), edited.modalTitle);
+  await ev(win, `closeModal(); true`);
+
+  const persistedEdit = await ev(win, `window.factapi.storeGet().then(function (d) {
+    const inv = d.invoices.filter(function (i) { return i.status === 'validated'; })[0];
+    return { n: (inv.payments || []).length, amount: (inv.payments || [])[0] && inv.payments[0].amount };
+  })`);
+  check('modification persistée dans la base', persistedEdit.n === 1 && persistedEdit.amount === 300, persistedEdit);
 
   /* --- G. sauvegarde / restauration par choix d'emplacement --- */
   const snap = await ev(win, `window.factapi.storeGet()`);
@@ -2910,7 +2979,7 @@ async function phaseGuide(win) {
   })()`);
   check('guide : couverture, sommaire, articles et aide-mémoire rendus (FR)',
     fr.dir === 'ltr' && fr.title === 'Guide d’utilisation' && fr.toc && fr.memo && fr.articles >= 40, fr);
-  check('guide : version affichée sur la couverture', /v1\.21/.test(fr.coverText), fr.coverText.slice(0, 100));
+  check('guide : version affichée sur la couverture', /v1\.22/.test(fr.coverText), fr.coverText.slice(0, 100));
 
   const pdf = await win.webContents.printToPDF({ printBackground: true, pageSize: 'A4' });
   check('guide : export PDF non vide (%PDF)',

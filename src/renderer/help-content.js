@@ -378,8 +378,14 @@
         ]
       },
       tips: {
-        fr: ['Un paiement partiel laisse la facture « partiellement payée ».'],
-        ar: ['الدفعة الجزئية تُبقي الفاتورة «مدفوعة جزئيًا».']
+        fr: [
+          'Un paiement partiel laisse la facture « partiellement payée ».',
+          'Dans l’historique d’une facture, ✎ modifie un règlement et ✕ le supprime.'
+        ],
+        ar: [
+          'الدفعة الجزئية تُبقي الفاتورة «مدفوعة جزئيًا».',
+          'في سجل الفاتورة، ✎ يعدّل دفعة و✕ يحذفها.'
+        ]
       },
       related: ['task.payment', 'screen.invoices', 'gloss.lettrage']
     },
@@ -587,8 +593,14 @@
         ]
       },
       tips: {
-        fr: ['Un règlement partiel met la facture en « partiellement payée ».'],
-        ar: ['الدفعة الجزئية تجعل الفاتورة «مدفوعة جزئيًا».']
+        fr: [
+          'Un règlement partiel met la facture en « partiellement payée ».',
+          'Pour corriger un règlement : ✎ dans l’historique de la facture.'
+        ],
+        ar: [
+          'الدفعة الجزئية تجعل الفاتورة «مدفوعة جزئيًا».',
+          'لتصحيح دفعة: ✎ في سجل الفاتورة.'
+        ]
       },
       errors: {
         fr: ['Le montant ne doit pas dépasser le reste dû.'],

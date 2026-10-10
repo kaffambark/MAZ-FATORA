@@ -1806,6 +1806,7 @@ function paymentHistoryHTML(inv) {
         <div class="li-sub">${[p.reference, p.note].filter(Boolean).map(esc).join(' · ') || '—'}</div>
       </div>
       <div class="row">
+        ${isAccounted(inv) ? '' : `<button class="btn small" data-action="pay-edit" data-id="${esc(inv.id)}" data-pay="${esc(p.id)}" title="${tr('paym.edit')}">✎</button>`}
         <button class="btn small danger" data-action="pay-delete" data-id="${esc(inv.id)}" data-pay="${esc(p.id)}" title="${tr('paym.delete')}">✕</button>
       </div>
     </div>`).join('');
@@ -1898,6 +1899,62 @@ async function deletePayment(invId, payId) {
   renderAll();
   toast(tr('paym.deleted'));
   openPaymentModal(invId);
+}
+
+/* Modification d'un règlement existant : formulaire pré-rempli. Le montant ne
+   peut pas dépasser le total encaissable (reste dû actuel + ancien montant),
+   afin de ne jamais encaisser plus que le TTC. Bloqué si la facture est
+   comptabilisée (comme l'édition de la facture elle-même). */
+function openEditPaymentModal(invId, payId) {
+  const inv = invoiceById(invId);
+  if (!inv) { toast(tr('common.notFound'), 'error'); return; }
+  if (isAccounted(inv)) { toast(tr('inv.lockedEdit'), 'error'); return; }
+  const rec = paymentList(inv).find((p) => p.id === payId);
+  if (!rec) { toast(tr('common.notFound'), 'error'); return; }
+
+  const rest = restDue(inv);
+  const maxAmount = round2(rest + Number(rec.amount || 0));
+  const methodOptions = METHODS.map((m) =>
+    `<option value="${m}"${m === rec.method ? ' selected' : ''}>${esc(methodLabel(m))}</option>`).join('');
+
+  openModal(`
+    <h2>${tr('paym.editTitle')}</h2>
+    <p class="modal-sub">${esc(tr('paym.for', { n: inv.number || tr('common.draft'), client: clientNameOf(inv) }))} · ${esc(tr('paym.rest', { v: money(rest) }))}</p>
+
+    <div class="form-grid" style="margin-top:14px">
+      <label>${tr('paym.amount')} <input type="number" id="pay-amount" step="0.01" min="0" value="${Number(rec.amount).toFixed(2)}"></label>
+      <label>${tr('paym.date')} <input type="date" id="pay-date" value="${esc(rec.date || todayISO())}"></label>
+      <label>${tr('paym.method')} <select id="pay-method">${methodOptions}</select></label>
+      <label class="wide">${tr('paym.reference')} <input type="text" id="pay-ref" value="${esc(rec.reference || '')}" placeholder="CHQ 123456 / VIR 789"></label>
+      <label class="wide">${tr('paym.note')} <input type="text" id="pay-note" value="${esc(rec.note || '')}"></label>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn" id="pay-cancel">${tr('common.cancel')}</button>
+      <button class="btn success" id="pay-save">${tr('paym.saveEdit')}</button>
+    </div>
+  `);
+
+  /* Annuler : on revient à la fiche de la facture (historique intact). */
+  $('#pay-cancel').addEventListener('click', () => openPaymentModal(invId));
+
+  $('#pay-save').addEventListener('click', async () => {
+    const amount = round2(Number($('#pay-amount').value));
+    if (!(amount > 0)) { toast(tr('paym.errAmount'), 'error'); return; }
+    if (amount > maxAmount + 0.005) { toast(tr('paym.errOverEdit', { v: money(amount), r: money(maxAmount) }), 'error'); return; }
+
+    rec.date = $('#pay-date').value || todayISO();
+    rec.amount = amount;
+    rec.method = $('#pay-method').value || 'other';
+    rec.reference = $('#pay-ref').value.trim();
+    rec.note = $('#pay-note').value.trim();
+    inv.paid = isPaid(inv);
+
+    await persist('invoices');
+    renderAll();
+    openPaymentModal(invId);
+    toast(tr('paym.edited'), 'success');
+  });
 }
 
 /* ---------------- Génération par période + client unique ---------------- */
@@ -2986,6 +3043,7 @@ document.addEventListener('click', async (e) => {
     }
     case 'delete-quote': await deleteQuote(id); break;
     case 'pay-invoice': openPaymentModal(id); break;
+    case 'pay-edit': openEditPaymentModal(id, el.dataset.pay); break;
     case 'pay-delete': await deletePayment(id, el.dataset.pay); break;
     case 'draft-from-tx': {
       const tx = txById(id);
