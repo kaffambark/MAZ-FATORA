@@ -19,6 +19,8 @@ Trois modules complémentaires :
   (facturé / encaissé / reste à encaisser / retards) ;
 - **Avoirs (notes de crédit)** : documents **AV‑AAAA‑NNNN** rattachés à une facture validée
   (retour, remise, correction) ; ils réduisent le **reste dû** et la **TVA collectée** ;
+- **Balance âgée** : reste dû par client classé par ancienneté (non échu · 0-30 · 31-60 · 61-90 ·
+  +90 j), net des encaissements et des avoirs, avec **export CSV** ;
 - **Sauvegarde & restauration** de toute la base à l'**emplacement de votre choix** (fichier JSON).
 
 Et une **protection de l'application** (Paramètres → Sécurité), **version monoposte** : un **mot de
@@ -49,10 +51,28 @@ npm test
 
 ## Version
 
-La **version** s'affiche en bas de la barre latérale (ex. `v1.24`). À **chaque modification** du
+La **version** s'affiche en bas de la barre latérale (ex. `v1.25`). À **chaque modification** du
 projet, le champ `version` de `package.json` est incrémenté par la **partie mineure**
 (`1.0` → `1.1` → `1.2` …) et l'application affiche `major.minor`. Les noms d'installateurs
-reprennent la version complète (`1.24.0`).
+reprennent la version complète (`1.25.0`).
+
+## v1.25 — Balance âgée (clients)
+
+Nouvel écran **Balance âgée** pour piloter les encaissements par client et par ancienneté :
+
+1. **Moteur d'ancienneté partagé** (`src/renderer/aging.js`, module **UMD** sans dépendance) utilisé
+   à la fois par l'écran **et** par le paquet comptable (`export-pack.js`) : une seule règle de
+   calcul, colonnes identiques (Total TTC, encaissé, **avoirs**, reste dû, jours, tranche).
+2. **Reste dû net** : le reste dû déduit automatiquement les encaissements **et** les **avoirs
+   validés** (cohérent avec v1.24).
+3. **Tranches déterministes** : Non échue · 0-30 j · 31-60 j · 61-90 j · +90 j — une échéance du
+   jour ou future compte comme « Non échue ».
+4. **Vue in-app** : indicateurs (total restant dû, non échu, échu, échu > 90 j), recherche,
+   filtre par tranche, tableau détaillé et répartition par ancienneté.
+5. **Export CSV** (`;` + BOM UTF-8) vers l'emplacement choisi, avec en-têtes localisés.
+6. **Paquet comptable** : la feuille `balance-agee` (CSV/ODS) gagne une colonne **Avoirs**
+   (FR/AR) et applique le même moteur.
+7. **Aide** : nouvelle vue « Balance âgée » + article bilingue (parité FR/AR testée).
 
 ## v1.24 — Avoirs / notes de crédit
 

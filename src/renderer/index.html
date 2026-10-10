@@ -76,6 +76,9 @@
         <button class="nav-item" data-view="credits">
           <svg class="ic"><use href="#i-invoices"/></svg><span class="nav-label" data-i18n="nav.credits">Avoirs</span><span class="badge" id="nav-credits-count">0</span>
         </button>
+        <button class="nav-item" data-view="balance">
+          <svg class="ic"><use href="#i-payments"/></svg><span class="nav-label" data-i18n="nav.balance">Balance âgée</span>
+        </button>
         <button class="nav-item" data-view="payments">
           <svg class="ic"><use href="#i-payments"/></svg><span class="nav-label" data-i18n="nav.payments">Paiements</span>
         </button>
@@ -415,6 +418,62 @@
           <p class="hint" data-i18n-html="cr.hint">Un avoir (note de crédit) est numéroté <strong>AV‑AAAA‑NNNN</strong> et vient en déduction d'une facture : le reste dû et la TVA collectée sont diminués. Il est toujours rattaché à une facture validée.</p>
           <div class="table-wrap">
             <table id="credit-table"></table>
+          </div>
+        </div>
+      </section>
+
+      <!-- BALANCE ÂGÉE -->
+      <section id="view-balance" class="view">
+        <header class="view-header">
+          <h1 data-i18n="bal.title">Balance âgée des clients</h1>
+          <div class="actions">
+            <input type="search" id="bal-search" data-i18n-ph="bal.search" placeholder="Rechercher un client ou un n° de facture…">
+            <select id="bal-filter">
+              <option value="all" data-i18n="bal.filterAll">Toutes les tranches</option>
+              <option value="notdue" data-i18n="bal.tNotdue">Non échue</option>
+              <option value="overdue" data-i18n="bal.overdue">Échu</option>
+              <option value="0-30" data-i18n="bal.t030">0-30 j</option>
+              <option value="31-60" data-i18n="bal.t3160">31-60 j</option>
+              <option value="61-90" data-i18n="bal.t6190">61-90 j</option>
+              <option value="90+" data-i18n="bal.t90">+90 j</option>
+            </select>
+            <button class="btn primary" id="btn-export-balance">
+              <svg class="ic"><use href="#i-check"/></svg><span data-i18n="bal.export">Exporter (CSV)</span>
+            </button>
+          </div>
+        </header>
+
+        <div class="stats">
+          <div class="stat card">
+            <span class="stat-label" data-i18n="bal.total">Total restant dû</span>
+            <span class="stat-value money" id="bal-stat-total">0,00 MAD</span>
+            <span class="stat-sub" id="bal-stat-total-sub"></span>
+          </div>
+          <div class="stat card">
+            <span class="stat-label" data-i18n="bal.notDue">Non échu</span>
+            <span class="stat-value money" id="bal-stat-notdue">0,00 MAD</span>
+            <span class="stat-sub"></span>
+          </div>
+          <div class="stat card">
+            <span class="stat-label" data-i18n="bal.overdue">Échu</span>
+            <span class="stat-value money" id="bal-stat-overdue">0,00 MAD</span>
+            <span class="stat-sub"></span>
+          </div>
+          <div class="stat card">
+            <span class="stat-label" data-i18n="bal.over90">Échu &gt; 90 jours</span>
+            <span class="stat-value money" id="bal-stat-over90">0,00 MAD</span>
+            <span class="stat-sub"></span>
+          </div>
+        </div>
+
+        <div class="card">
+          <p class="hint" data-i18n="bal.hint">Reste dû par facture validée, après encaissements et avoirs, classé par ancienneté.</p>
+          <div class="table-wrap">
+            <table id="bal-table"></table>
+          </div>
+          <h3 class="muted" style="margin-top:14px" data-i18n="bal.buckets">Répartition par ancienneté</span></h3>
+          <div class="table-wrap">
+            <table id="bal-buckets"></table>
           </div>
         </div>
       </section>
@@ -901,6 +960,7 @@
   <script src="csv.js"></script>
   <script src="words.js"></script>
   <script src="doc-config.js"></script>
+  <script src="aging.js"></script>
   <script src="help-content.js"></script>
   <script src="help.js"></script>
   <script src="onboarding.js"></script>

@@ -202,11 +202,18 @@ ipcMain.handle('file:pick-logo', async () => ({
    vrai main.js, non chargé ici — la phase se concentre sur le paquet et son
    intégrité. Le zip est écrit dans .tmp, dans le dossier de test. */
 const exportPack = require(path.join(__dirname, '..', 'src', 'main', 'export-pack.js'));
+/* Balance âgée : le sélecteur de fichier est remplacé ; on mémorise le contenu
+   CSV transmis par le rendu pour vérifier l'export sans dialogue. */
+let lastAgingExport = null;
+ipcMain.handle('aging:export-csv', (event, payload) => {
+  lastAgingExport = payload || null;
+  return { canceled: false, path: path.join(__dirname, '.tmp', 'balance-agee.csv') };
+});
 ipcMain.handle('export:close-period', async (event, period) => {
   const pack = exportPack.buildPack(storeStub, {
     from: period && period.from,
     to: period && period.to,
-    appVersion: '1.23'
+    appVersion: '1.25'
   });
   const zipPath = path.join(__dirname, '.tmp', pack.base + '_cloture.zip');
   fs.writeFileSync(zipPath, exportPack.zipBuffer(pack.files));
@@ -214,7 +221,7 @@ ipcMain.handle('export:close-period', async (event, period) => {
 });
 
 /* Version de l'application (lue dans package.json par le vrai main.js) */
-ipcMain.handle('app:version', () => '1.24');
+ipcMain.handle('app:version', () => '1.25');
 
 function check(name, cond, detail) {
   if (cond) console.log('  ok   ' + name);
@@ -272,13 +279,13 @@ async function phaseUi() {
   })()`);
 
   check('API preload présente', base.hasApi);
-  check('11 vues rendues (dont Avoirs, Paiements et Devis)', base.views === 11, base.views);
+  check('12 vues rendues (dont Avoirs, Balance âgée, Paiements et Devis)', base.views === 12, base.views);
   check('nom de l\'application = MAZ-FATORA', base.title === 'MAZ-FATORA', base.title);
   check('logo de marque chargé (Logo.png)', base.logo && base.logo.ok, base.logo);
   check('logo posé sur fond blanc (lisibilité sur la sidebar bleue)',
     base.brandBg === 'rgb(255, 255, 255)', base.brandBg);
   check('favicon Icon.png déclaré', /Icon\.png/.test(base.favicon || ''), base.favicon);
-  check('version affichée dans la sidebar (v1.24)', base.version === 'v1.24', base.version);
+  check('version affichée dans la sidebar (v1.25)', base.version === 'v1.25', base.version);
   check('tableau de bord rempli', base.dashRendered);
   check('parseur CSV', !base.csvError && base.csv && base.csv.length === 3 &&
     base.csv[0].amount === 1200.5 && base.csv[1].amount === -25.5 && base.csv[2].amount === 34.99, base.csv || base.csvError);
@@ -631,8 +638,8 @@ async function phaseExtras(win) {
       dbPath: (document.querySelector('#set-db-path') || {}).value || ''
     };
   })()`);
-  check('11 vues et 11 entrées de menu (nouvelles vues Avoirs et Paiements)',
-    entry.views === 11 && entry.navs === 11, entry);
+  check('12 vues et 12 entrées de menu (nouvelles vues Avoirs et Balance âgée)',
+    entry.views === 12 && entry.navs === 12, entry);
   check('accès « Nouvelle facture » (tableau de bord + factures validées)',
     entry.dashBtn && entry.invBtn, entry);
   check('vue Paiements : recherche et filtre présents', entry.payFilters, entry);
@@ -978,8 +985,8 @@ async function phaseExtras(win) {
       payments: val[0] ? (val[0].payments || []).length : -1
     };
   })()`);
-  check('état final propre (11 vues, modale fermée, base affichée, 1 règlement)',
-    final.views === 11 && final.modalHidden && final.dbPath === DATA_DIR && final.payments === 1, final);
+  check('état final propre (12 vues, modale fermée, base affichée, 1 règlement)',
+    final.views === 12 && final.modalHidden && final.dbPath === DATA_DIR && final.payments === 1, final);
 }
 
 async function phasePdf(uiWin) {
@@ -1833,7 +1840,7 @@ async function phaseSecurite(uiWin) {
   })()`);
   check('3 : sans protection, l\'application s\'ouvre normalement (pas d\'écran de verrouillage)',
     s0.lockHidden === true && s0.lockBtnHidden === true && s0.hasSecCard === true &&
-    s0.enableHidden === false && s0.views === 11 && s0.dash.length > 0, s0);
+    s0.enableHidden === false && s0.views === 12 && s0.dash.length > 0, s0);
 
   /* --- b) activation : Paramètres → Sécurité → « Activer la protection » --- */
   await ev(win, `showView('settings'); true`);
@@ -2290,10 +2297,10 @@ async function phaseExportPack(uiWin) {
     /2026-09-15;FA-2026-0042;Dupont SARL;600\.00;Virement;VIR-1;Validée/.test(enc), enc);
 
   const bal = zipRead(zb, 'Client-Smoke_2026-09_balance-agee.csv').toString('utf8');
-  check('5 : balance âgée — restes + tranches (août échue en 0-30 j)',
-    /;FA-2026-0042;2026-09-10;2026-10-10;1200\.00;600\.00;600\.00;0;Non échue/.test(bal) &&
-    /;FA-2026-0043;2026-09-20;2026-10-20;285\.00;0\.00;285\.00;0;Non échue/.test(bal) &&
-    /;FA-2026-0044;2026-08-15;2026-09-15;120\.00;0\.00;120\.00;\d+;0-30 j/.test(bal), bal);
+  check('5 : balance âgée — restes (avoirs déduits) + tranches (août échue en 0-30 j)',
+    /;FA-2026-0042;2026-09-10;2026-10-10;1200\.00;600\.00;0\.00;600\.00;0;Non échue/.test(bal) &&
+    /;FA-2026-0043;2026-09-20;2026-10-20;285\.00;0\.00;0\.00;285\.00;0;Non échue/.test(bal) &&
+    /;FA-2026-0044;2026-08-15;2026-09-15;120\.00;0\.00;0\.00;120\.00;\d+;0-30 j/.test(bal), bal);
 
   const rap = zipRead(zb, 'Client-Smoke_2026-09_rapprochement.csv').toString('utf8');
   check('5 : rapprochement — ligne bancaire de la période, non rattachée',
@@ -2786,7 +2793,7 @@ async function phaseHelp(win) {
     };
   })()`);
   check('aide : contenu et moteur chargés',
-    loaded.hasContent && loaded.hasUi && loaded.articles >= 41 && loaded.cats >= 5 && loaded.screens === 11, loaded);
+    loaded.hasContent && loaded.hasUi && loaded.articles >= 43 && loaded.cats >= 5 && loaded.screens === 12, loaded);
 
   const triggers = await ev(win, `(function () {
     return {
@@ -2796,7 +2803,7 @@ async function phaseHelp(win) {
     };
   })()`);
   check('aide : bouton latéral présent', triggers.side === true, triggers);
-  check('aide : bouton « ? » sur chaque écran', triggers.screenBtns === 11, triggers);
+  check('aide : bouton « ? » sur chaque écran', triggers.screenBtns === 12, triggers);
 
   await ev(win, `(function () {
     showView('invoices');
@@ -3017,7 +3024,7 @@ async function phaseGuide(win) {
   })()`);
   check('guide : couverture, sommaire, articles et aide-mémoire rendus (FR)',
     fr.dir === 'ltr' && fr.title === 'Guide d’utilisation' && fr.toc && fr.memo && fr.articles >= 40, fr);
-  check('guide : version affichée sur la couverture', /v1\.24/.test(fr.coverText), fr.coverText.slice(0, 100));
+  check('guide : version affichée sur la couverture', /v1\.25/.test(fr.coverText), fr.coverText.slice(0, 100));
 
   const pdf = await win.webContents.printToPDF({ printBackground: true, pageSize: 'A4' });
   check('guide : export PDF non vide (%PDF)',
@@ -3168,6 +3175,65 @@ async function phaseCredits(uiWin) {
     del.n === 0 && del.seq === 0, del);
 }
 
+/* ---- PHASE : balance âgée (v1.25) ----
+   Vérifie le moteur partagé (AGING) côté rendu : reste dû net des avoirs,
+   tranches d'ancienneté, répartition et export CSV. */
+async function phaseBalance(uiWin) {
+  const win = uiWin;
+  await win.loadFile(path.join(__dirname, '..', 'src', 'renderer', 'index.html'));
+  await wait(900);
+
+  const view = await ev(win, `(function () {
+    const iso = (d) => { const x = new Date(); x.setDate(x.getDate() + d); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
+    state.invoices = [
+      { id: 'b1', status: 'validated', number: 'FA-2026-0001', clientId: 'c1', clientName: 'Dupont SARL', issueDate: iso(-5), dueDate: iso(10), lines: [{ desc: 'A', qty: 1, price: 1000, tva: 20 }], payments: [], paid: false },
+      { id: 'b2', status: 'validated', number: 'FA-2026-0002', clientId: 'c1', clientName: 'Dupont SARL', issueDate: iso(-40), dueDate: iso(-10), lines: [{ desc: 'B', qty: 1, price: 500, tva: 20 }], payments: [], paid: false },
+      { id: 'b3', status: 'validated', number: 'FA-2026-0003', clientId: 'c1', clientName: 'Dupont SARL', issueDate: iso(-130), dueDate: iso(-100), lines: [{ desc: 'C', qty: 1, price: 1000, tva: 0 }], payments: [], paid: false }
+    ];
+    state.creditNotes = [
+      { id: 'bc1', status: 'validated', number: 'AV-2026-0001', refInvoiceId: 'b2', refNumber: 'FA-2026-0002', clientName: 'Dupont SARL', lines: [{ desc: 'retour', qty: 1, price: 100, tva: 20 }] }
+    ];
+    renderAll();
+    showView('balance');
+    return {
+      total: document.querySelector('#bal-stat-total').textContent,
+      notdue: document.querySelector('#bal-stat-notdue').textContent,
+      over: document.querySelector('#bal-stat-overdue').textContent,
+      over90: document.querySelector('#bal-stat-over90').textContent,
+      rows: document.querySelectorAll('#bal-table tbody tr').length,
+      bucketRows: document.querySelectorAll('#bal-buckets tbody tr').length,
+      creditCell: (document.querySelector('#bal-table tbody') || {}).textContent || ''
+    };
+  })()`);
+  /* b1 : 1 200 non échu ; b2 : 600 − 120 d'avoir = 480 (échue) ; b3 : 1 000 (>90 j).
+     Total 2 680,00 ; non échu 1 200,00 ; échu 1 480,00 ; >90 j 1 000,00. */
+  check('balance âgée : total 2 680,00 (non échu 1 200, échu 1 480, >90 j 1 000)',
+    /2\s?680,00/.test(view.total) && /1\s?200,00/.test(view.notdue) &&
+    /1\s?480,00/.test(view.over) && /1\s?000,00/.test(view.over90) &&
+    view.rows === 3 && view.bucketRows === 6, view);
+  check('balance âgée : les avoirs réduisent le reste dû (avoir 120,00 → reste 480,00)',
+    /120,00/.test(view.creditCell) && /480,00/.test(view.creditCell), String(view.creditCell).slice(0, 140));
+
+  /* Filtre « échu » : deux factures en retard (0-30 j et +90 j) */
+  const filtered = await ev(win, `(function () {
+    const sel = document.querySelector('#bal-filter');
+    sel.value = 'overdue';
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    return { rows: document.querySelectorAll('#bal-table tbody tr').length };
+  })()`);
+  check('balance âgée : filtre « Échu » → 2 factures en retard',
+    filtered.rows === 2, filtered);
+
+  /* Export CSV : contenu transmis au processus principal */
+  await ev(win, `(function () { document.querySelector('#bal-filter').value = 'all'; document.querySelector('#bal-filter').dispatchEvent(new Event('change', { bubbles: true })); document.querySelector('#btn-export-balance').click(); })()`);
+  await wait(250);
+  const exp = lastAgingExport || {};
+  check('balance âgée : export CSV (en-tête, factures, avoir déduit)',
+    /Client;N° facture/.test(exp.text || '') && /FA-2026-0002/.test(exp.text || '') &&
+    /480\.00/.test(exp.text || '') && /^balance-agee-\d{4}-\d{2}-\d{2}\.csv$/.test(exp.suggestedName || ''),
+    { name: exp.suggestedName, sample: String(exp.text || '').slice(0, 160) });
+}
+
 (async function main() {
   try {
     await app.whenReady();
@@ -3190,6 +3256,7 @@ async function phaseCredits(uiWin) {
     await phaseGuide(uiWin);
     await phaseHelp(uiWin);
     await phaseCredits(uiWin);
+    await phaseBalance(uiWin);
   } catch (e) {
     problems.push('exception: ' + (e && e.stack ? e.stack : e));
   }

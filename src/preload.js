@@ -39,6 +39,9 @@ contextBridge.exposeInMainWorld('factapi', {
   creditExportPdf: (creditId) => ipcRenderer.invoke('credit:export-pdf', creditId),
   creditPreview: (creditId) => ipcRenderer.invoke('credit:preview', creditId),
 
+  // Balance âgée (export CSV)
+  agingExportCsv: (payload) => ipcRenderer.invoke('aging:export-csv', payload),
+
   // Guide d'utilisation imprimable
   guidePreview: (lang) => ipcRenderer.invoke('guide:preview', lang),
   guideExportPdf: (lang) => ipcRenderer.invoke('guide:export-pdf', lang),

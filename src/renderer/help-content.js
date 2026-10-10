@@ -25,7 +25,7 @@
 
 (function (root) {
   /* Écrans de l'application (ancrage de l'aide contextuelle). */
-  const SCREENS = ['dashboard', 'import', 'transactions', 'drafts', 'invoices', 'quotes', 'credits', 'payments', 'clients', 'rules', 'settings'];
+  const SCREENS = ['dashboard', 'import', 'transactions', 'drafts', 'invoices', 'quotes', 'credits', 'balance', 'payments', 'clients', 'rules', 'settings'];
 
   const CATEGORIES = [
     { id: 'start', title: { fr: 'Démarrage', ar: 'البدء' }, icon: 'i-dash' },
@@ -392,6 +392,40 @@
         ]
       },
       related: ['screen.invoices', 'task.invoice-to-credit']
+    },
+
+    'screen.balance': {
+      category: 'screen', screen: 'balance', priority: 1,
+      title: { fr: 'La balance âgée', ar: 'أعمار الديون' },
+      goal: {
+        fr: "Voir ce qui reste à encaisser par client, classé par ancienneté (retard).",
+        ar: 'معرفة ما تبقّى للتحصيل حسب العميل، مرتّبًا حسب القدم (التأخر).'
+      },
+      steps: {
+        fr: [
+          'Ouvrez « Balance âgée ».',
+          'Filtrez par client, n° de facture ou par tranche d’ancienneté.',
+          'Les colonnes montrent Total TTC, encaissé, avoirs et reste dû.',
+          'Exportez la balance en CSV pour votre comptable si besoin.'
+        ],
+        ar: [
+          'افتح «أعمار الديون».',
+          'رشّح حسب العميل أو رقم الفاتورة أو شريحة القدم.',
+          'تُظهر الأعمدة المجموع شامل الضريبة، المقبوض، الإشعارات والباقي.',
+          'صدّر أعمار الديون بصيغة CSV لمحاسبك عند الحاجة.'
+        ]
+      },
+      tips: {
+        fr: [
+          'Le reste dû déduit automatiquement les encaissements et les avoirs validés.',
+          'Une échéance du jour ou future compte comme « Non échue ».'
+        ],
+        ar: [
+          'يُخصم الباقي تلقائيًا المقبوضات والإشعارات الدائنة المعتمدة.',
+          'الاستحقاق في اليوم أو مستقبلًا يُحتسب «غير مستحق».'
+        ]
+      },
+      related: ['screen.payments', 'screen.invoices', 'screen.credits']
     },
 
     'screen.payments': {

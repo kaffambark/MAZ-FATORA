@@ -574,6 +574,7 @@ function renderAll() {
   renderValidated();
   renderQuotes();
   renderCredits();
+  renderBalance();
   renderPayments();
   renderClients();
   renderRules();
@@ -995,7 +996,87 @@ function renderCredits() {
     <tbody>${rows || `<tr><td colspan="6" class="empty">${tr('cr.empty')}</td></tr>`}</tbody>`;
 }
 
-/* ---------------- Suivi des paiements (vue) ---------------- */
+/* ---------------- Balance âgée (vue) ----------------
+   Moteur PARTAGÉ window.AGING (src/renderer/aging.js) : le même que le paquet
+   comptable. Les avoirs validés sont déduits du reste dû. */
+
+const BAL_KEYS = { 'notdue': 'bal.tNotdue', '0-30': 'bal.t030', '31-60': 'bal.t3160', '61-90': 'bal.t6190', '90+': 'bal.t90' };
+
+function bucketLabel(id) {
+  return tr(BAL_KEYS[id] || 'bal.tNotdue');
+}
+
+function balanceData() {
+  const built = AGING.rows(state.invoices, { credits: state.creditNotes || [], ref: AGING.todayISO() });
+  built.rows.forEach((r) => { if (!r.clientName) r.clientName = clientNameOf({ clientId: r.clientId }); });
+  return built;
+}
+
+function renderBalance() {
+  const built = balanceData();
+  const b = built.buckets;
+  const overdue = round2(b['0-30'] + b['31-60'] + b['61-90'] + b['90+']);
+  $('#bal-stat-total').textContent = money(built.totals.rest);
+  $('#bal-stat-total-sub').textContent = tr('bal.nInvoices', { n: built.n });
+  $('#bal-stat-notdue').textContent = money(b.notdue);
+  $('#bal-stat-overdue').textContent = money(overdue);
+  $('#bal-stat-over90').textContent = money(b['90+']);
+
+  const q = norm($('#bal-search').value);
+  const f = $('#bal-filter').value;
+  let list = built.rows;
+  if (q) list = list.filter((r) => norm(r.number + ' ' + r.clientName).includes(q));
+  if (f && f !== 'all') {
+    list = (f === 'overdue') ? list.filter((r) => r.bucket !== 'notdue') : list.filter((r) => r.bucket === f);
+  }
+
+  const rows = built.rows && list.map((r) => `
+    <tr>
+      <td>${esc(r.clientName || tr('common.noClient'))}</td>
+      <td><strong>${esc(r.number || '—')}</strong></td>
+      <td>${dateFR(r.dueDate)}</td>
+      <td class="num">${money(r.totalTTC)}</td>
+      <td class="num">${money(r.paid)}</td>
+      <td class="num">${r.credited > 0 ? money(r.credited) : '—'}</td>
+      <td class="num"><strong>${money(r.rest)}</strong></td>
+      <td class="num">${r.days}</td>
+      <td>${bucketPill(r.bucket)}</td>
+    </tr>`).join('');
+
+  $('#bal-table').innerHTML = `
+    <thead><tr>
+      <th>${tr('bal.hClient')}</th><th>${tr('bal.hNumber')}</th><th>${tr('bal.hDue')}</th>
+      <th class="num">${tr('bal.hTTC')}</th><th class="num">${tr('bal.hPaid')}</th><th class="num">${tr('bal.hCredit')}</th>
+      <th class="num">${tr('bal.hRest')}</th><th class="num">${tr('bal.hDays')}</th><th>${tr('bal.hBucket')}</th>
+    </tr></thead>
+    <tbody>${rows || `<tr><td colspan="9" class="empty">${tr('bal.empty')}</td></tr>`}</tbody>`;
+
+  const order = ['notdue', '0-30', '31-60', '61-90', '90+'];
+  $('#bal-buckets').innerHTML = `
+    <thead><tr><th>${tr('bal.hBucket')}</th><th class="num">${tr('bal.hRest')}</th></tr></thead>
+    <tbody>${order.map((id) => `<tr><td>${bucketPill(id)}</td><td class="num">${money(b[id])}</td></tr>`).join('')}
+    <tr><td><strong>${tr('common.total')}</strong></td><td class="num"><strong>${money(built.totals.rest)}</strong></td></tr></tbody>`;
+}
+
+function bucketPill(id) {
+  const cls = id === 'notdue' ? 'green' : (id === '90+' ? 'red' : (id === '0-30' ? 'amber' : 'blue'));
+  return `<span class="pill ${cls}">${bucketLabel(id)}</span>`;
+}
+
+async function exportBalanceCsv() {
+  const built = balanceData();
+  const labels = {
+    client: tr('bal.hClient'), number: tr('bal.hNumber'), issue: tr('common.date'),
+    due: tr('bal.hDue'), ttc: tr('bal.hTTC'), paid: tr('bal.hPaid'), credited: tr('bal.hCredit'),
+    rest: tr('bal.hRest'), days: tr('bal.hDays'), bucket: tr('bal.hBucket')
+  };
+  const text = AGING.csv(built, labels);
+  const suggestedName = 'balance-agee-' + todayISO() + '.csv';
+  const res = await window.factapi.agingExportCsv({ text, suggestedName });
+  if (!res || res.canceled) return;
+  if (res.error) { toast(tr('common.error') + (res.msg || ''), 'error'); return; }
+  toast(tr('bal.exported', { path: res.path }), 'ok');
+}
 
 function renderPayments() {
   const enc = collectStats();
@@ -3509,6 +3590,10 @@ $('#quote-filter').addEventListener('change', renderQuotes);
 $('#btn-new-credit').addEventListener('click', () => { showView('credits'); openCreditPicker(); });
 $('#credit-search').addEventListener('input', renderCredits);
 $('#credit-filter').addEventListener('change', renderCredits);
+/* Balance âgée */
+$('#bal-search').addEventListener('input', renderBalance);
+$('#bal-filter').addEventListener('change', renderBalance);
+$('#btn-export-balance').addEventListener('click', exportBalanceCsv);
 $('#btn-new-client').addEventListener('click', () => openClientEditor(null));
 $('#btn-new-rule').addEventListener('click', () => openRuleEditor(null));
 

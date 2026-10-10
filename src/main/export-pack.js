@@ -8,6 +8,7 @@
    Format des CSV : séparateur « ; », décimales à point, BOM UTF-8 (Excel FR). */
 
 const crypto = require('crypto');
+const AGING = require('../renderer/aging.js');
 
 const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
 const NUM = (n) => (Number(n) || 0).toFixed(2);
@@ -183,41 +184,18 @@ function todayISO() {
   return n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0');
 }
 
-/* Ancienneté en JOURS (comparaison au jour, indépendante de l'heure d'exécution). */
-function ageDays(inv) {
-  const refISO = inv.dueDate || inv.issueDate;
-  if (!refISO) return 0;
-  const ref = new Date(refISO + 'T00:00:00');
-  if (isNaN(ref.getTime())) return 0;
-  const t = new Date(todayISO() + 'T00:00:00');
-  return Math.max(0, Math.round((t.getTime() - ref.getTime()) / 86400000));
-}
-function tranche(inv, days) {
-  if (!inv.dueDate) return 'Non échue';
-  /* Une échéance du jour même n'est pas encore « échue » (déterminisme : on ne
-     dépend plus de l'heure à laquelle le paquet est généré). */
-  if (inv.dueDate >= todayISO()) return 'Non échue';
-  if (days <= 30) return '0-30 j';
-  if (days <= 60) return '31-60 j';
-  if (days <= 90) return '61-90 j';
-  return '+90 j';
-}
-
+/* Balance âgée — moteur d'ancienneté PARTAGÉ (src/renderer/aging.js), le même
+   que la vue in-app : les avoirs validés viennent en déduction du reste dû.
+   Colonnes : Client, N° facture, Date, Échéance, Total TTC, Encaissé, Avoirs,
+   Reste, Ancienneté (jours), Tranche. */
 function balanceRows(data, invoices) {
-  const rows = [['Client', 'N° facture', 'Date facture', 'Échéance', 'Total TTC', 'Encaissé', 'Reste', 'Ancienneté (jours)', 'Tranche']];
-  const out = [];
-  for (const inv of invoices) {
-    const t = invoiceTotals(inv);
-    const paid = paidTotal(inv);
-    const rest = round2(t.ttc - paid);
-    if (rest <= 0.005) continue;
-    const d = ageDays(inv);
-    out.push([
-      clientNameOf(data, inv), inv.number || 'Brouillon', inv.issueDate || '', inv.dueDate || '',
-      NUM(t.ttc), NUM(paid), NUM(rest), d, tranche(inv, d)
-    ]);
-  }
-  out.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  const rows = [['Client', 'N° facture', 'Date facture', 'Échéance', 'Total TTC', 'Encaissé', 'Avoirs', 'Reste', 'Ancienneté (jours)', 'Tranche']];
+  const built = AGING.rows(invoices, { credits: data.creditNotes || [], ref: todayISO(), onlyValidated: false });
+  const out = built.rows.map((r) => [
+    r.clientName || clientNameOf(data, { clientId: r.clientId, clientName: r.clientName }),
+    r.number || 'Brouillon', r.issueDate || '', r.dueDate || '',
+    NUM(r.totalTTC), NUM(r.paid), NUM(r.credited), NUM(r.rest), r.days, AGING.labelFr(r.bucket)
+  ]);
   return rows.concat(out);
 }
 
@@ -271,7 +249,7 @@ function buildPack(data, opts) {
   const AR_JOURNAL = ['التاريخ', 'رقم الفاتورة', 'العميل', 'البيان', 'الكمية', 'الثمن الوحدوي خارج الضريبة', 'نسبة الضريبة %', 'المبلغ خارج الضريبة', 'الضريبة', 'المجموع شامل الضريبة', 'الحالة', 'المقبوض', 'الباقي'];
   const AR_TVA = ['نسبة الضريبة', 'الوعاء خارج الضريبة', 'الضريبة المحصلة'];
   const AR_ENCAISSEMENTS = ['التاريخ', 'رقم الفاتورة', 'العميل', 'المبلغ', 'وسيلة الأداء', 'المرجع', 'حالة الفاتورة'];
-  const AR_BALANCE = ['العميل', 'رقم الفاتورة', 'تاريخ الفاتورة', 'الاستحقاق', 'المجموع شامل الضريبة', 'المقبوض', 'الباقي', 'القدم (أيام)', 'الشريحة'];
+  const AR_BALANCE = ['العميل', 'رقم الفاتورة', 'تاريخ الفاتورة', 'الاستحقاق', 'المجموع شامل الضريبة', 'المقبوض', 'الإشعارات الدائنة', 'الباقي', 'القدم (أيام)', 'الشريحة'];
 
   const reports = [
     { csv: 'journal.csv', ods: 'journal.ods', sheet: 'Journal de ventes', rows: journalRows(data, invoices), ar: AR_JOURNAL },

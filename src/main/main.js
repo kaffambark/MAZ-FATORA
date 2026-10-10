@@ -582,6 +582,30 @@ function registerIpc() {
     }
   })));
 
+  /* Balance âgée : export CSV construit par le rendu (même moteur que l'écran),
+     écrit à l'emplacement choisi par l'utilisateur. */
+  ipcMain.handle('aging:export-csv', gated(async (event, payload) => {
+    const parent = ipcWindow(event);
+    const text = (payload && payload.text) || '';
+    const suggested = (payload && payload.suggestedName) || 'balance-agee.csv';
+    if (!text) return { error: 'empty' };
+    const save = await dialog.showSaveDialog(parent, {
+      title: I18N.tr('bal.exportTitle'),
+      defaultPath: path.join(app.getPath('documents'), suggested),
+      filters: [
+        { name: I18N.tr('main.filterCsv'), extensions: ['csv'] },
+        { name: I18N.tr('main.filterAll'), extensions: ['*'] }
+      ]
+    });
+    if (save.canceled || !save.filePath) return { canceled: true };
+    try {
+      fs.writeFileSync(save.filePath, text, 'utf8');
+      return { canceled: false, path: save.filePath };
+    } catch (e) {
+      return { canceled: false, error: 'write', msg: String(e && e.message ? e.message : e) };
+    }
+  }));
+
   ipcMain.handle('file:pick-statement', gated(async (event) => {
     const parent = ipcWindow(event);
     const res = await dialog.showOpenDialog(parent, {
