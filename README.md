@@ -47,10 +47,23 @@ npm test
 
 ## Version
 
-La **version** s'affiche en bas de la barre latérale (ex. `v1.17`). À **chaque modification** du
+La **version** s'affiche en bas de la barre latérale (ex. `v1.18`). À **chaque modification** du
 projet, le champ `version` de `package.json` est incrémenté par la **partie mineure**
 (`1.0` → `1.1` → `1.2` …) et l'application affiche `major.minor`. Les noms d'installateurs
-reprennent la version complète (`1.17.0`).
+reprennent la version complète (`1.18.0`).
+
+## v1.18 — Identifiants légaux au choix + réglages appliqués aussitôt
+
+- **Identifiants légaux sélectionnables un par un** dans « Modèle des documents » :
+  **ICE / IF / RC / Patente / CNSS / TVA** peuvent être affichés ou masqués
+  indépendamment (dans l'en-tête société comme dans le bandeau de pied) ;
+- **Réglages appliqués immédiatement** : toute modification de la carte « Modèle des
+  documents » est enregistrée aussitôt — plus besoin de repasser par « Enregistrer les
+  paramètres » pour que le changement apparaisse sur les factures/devis ; le bouton
+  **Aperçu** enregistre d'abord le réglage courant ;
+- **Balance âgée (paquet comptable)** : l'ancienneté est calculée en **jours** (et non
+  selon l'heure d'exécution) — une échéance du jour même n'est plus classée « échue ».
+  Résultat **déterministe**.
 
 ## v1.17 — Modèle des documents personnalisable (PDF factures & devis)
 
@@ -67,8 +80,9 @@ défaut reproduit à l'identique** le document historique.
   personnalisée** ;
 - **Format** : A4 / A5, **marges** étroites / normales / larges, **densité** et **police**
   (avec ou sans empattement) ;
-- **Informations affichées** (cases à cocher) : logo, nom arabe, identifiants de la
-  société (ICE/IF/RC/Patente/CNSS/TVA), bloc client, TVA détaillée par taux, régime de
+- **Informations affichées** (cases à cocher) : logo, nom arabe, **identifiants légaux
+  sélectionnables un par un** (ICE / IF / RC / Patente / CNSS / TVA), bloc client, TVA
+  détaillée par taux, régime de
   TVA, RIB, notes, mentions légales, bloc **signature/cachet**, **échéance** (facture),
   **validité** (devis) et le choix des **colonnes** de lignes (Qté, P.U., TVA, Total HT) ;
 - **Montant en toutes lettres** : français + arabe, français seul, arabe seul, ou aucun ;
@@ -76,8 +90,10 @@ défaut reproduit à l'identique** le document historique.
 - **Filigrane** : aucun, « PAYÉE », « BROUILLON », « DEVIS » ;
 - **Textes libres** : en-tête, conditions de règlement et pied de page personnalisés
   (remplacent les mentions par défaut) ;
-- **Aperçu** du dernier document et **réinitialisation** du modèle. Avertissement
-  lorsque les identifiants légaux sont masqués (risque de non-conformité).
+- **Aperçu** du dernier document et **réinitialisation** du modèle. Les réglages sont
+  **appliqués immédiatement** (enregistrés au changement) : plus besoin de repasser par
+  « Enregistrer les paramètres ». Avertissement lorsque les identifiants légaux sont
+  masqués (risque de non-conformité).
 
 ## v1.16 — Comptabilisation des factures (numérotation continue)
 

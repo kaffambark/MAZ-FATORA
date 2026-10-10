@@ -58,7 +58,8 @@
     blocks: {
       logo: true,
       nameAr: true,
-      companyIds: true,
+      /* Identifiants légaux : chacun peut être affiché ou masqué séparément */
+      ids: { ice: true, if: true, rc: true, patente: true, cnss: true, tva: true },
       clientIds: true,
       tvaDetail: true,
       regime: true,
@@ -108,7 +109,15 @@
     const b = (d.blocks && typeof d.blocks === 'object') ? d.blocks : {};
     for (const k of Object.keys(DEFAULT.blocks)) {
       if (k === 'words') out.blocks.words = pick(b.words, WORDS_MODES, DEFAULT.blocks.words);
-      else out.blocks[k] = (k in b) ? !!b[k] : DEFAULT.blocks[k];
+      else if (k === 'ids') {
+        const src = (b.ids && typeof b.ids === 'object') ? b.ids : {};
+        /* Rétro-compatibilité : ancien réglage global `companyIds`. */
+        const legacy = (b.companyIds === undefined) ? true : !!b.companyIds;
+        out.blocks.ids = {};
+        for (const idk of Object.keys(DEFAULT.blocks.ids)) {
+          out.blocks.ids[idk] = (idk in src) ? !!src[idk] : legacy;
+        }
+      } else out.blocks[k] = (k in b) ? !!b[k] : DEFAULT.blocks[k];
     }
     const t = (d.texts && typeof d.texts === 'object') ? d.texts : {};
     out.texts.header = typeof t.header === 'string' ? t.header.slice(0, 500) : '';

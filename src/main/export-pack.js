@@ -178,19 +178,25 @@ function encaissementsRows(data, invoices, from, to) {
   return rows.concat(out);
 }
 
+function todayISO() {
+  const n = new Date();
+  return n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0');
+}
+
+/* Ancienneté en JOURS (comparaison au jour, indépendante de l'heure d'exécution). */
 function ageDays(inv) {
-  const today = new Date();
-  let due = null;
-  if (inv.dueDate) {
-    const d = new Date(inv.dueDate + 'T12:00:00');
-    if (!isNaN(d.getTime())) due = d;
-  }
-  const ref = due || new Date(inv.issueDate + 'T12:00:00');
-  const ms = today.getTime() - ref.getTime();
-  return Math.max(0, Math.floor(ms / 86400000));
+  const refISO = inv.dueDate || inv.issueDate;
+  if (!refISO) return 0;
+  const ref = new Date(refISO + 'T00:00:00');
+  if (isNaN(ref.getTime())) return 0;
+  const t = new Date(todayISO() + 'T00:00:00');
+  return Math.max(0, Math.round((t.getTime() - ref.getTime()) / 86400000));
 }
 function tranche(inv, days) {
-  if (!inv.dueDate || new Date(inv.dueDate + 'T12:00:00').getTime() >= new Date().getTime()) return 'Non échue';
+  if (!inv.dueDate) return 'Non échue';
+  /* Une échéance du jour même n'est pas encore « échue » (déterminisme : on ne
+     dépend plus de l'heure à laquelle le paquet est généré). */
+  if (inv.dueDate >= todayISO()) return 'Non échue';
   if (days <= 30) return '0-30 j';
   if (days <= 60) return '31-60 j';
   if (days <= 90) return '61-90 j';

@@ -107,7 +107,7 @@ const WM_TEXT = { paid: 'PAYÉE', draft: 'BROUILLON', quote: 'DEVIS / AR' };
       st.textContent = '@media print { @page { size: A5; margin: 10mm; } }';
       document.head.appendChild(st);
     }
-    const b = docConf ? docConf.blocks : { logo: 1, nameAr: 1, companyIds: 1, clientIds: 1, tvaDetail: 1, regime: 1, rib: 1, notes: 1, words: 'both', legal: 1, signature: 0, dueDate: 1, validity: 1, colsQty: 1, colsPu: 1, colsTva: 1, colsTotal: 1 };
+    const b = docConf ? docConf.blocks : { logo: 1, nameAr: 1, ids: { ice: 1, if: 1, rc: 1, patente: 1, cnss: 1, tva: 1 }, clientIds: 1, tvaDetail: 1, regime: 1, rib: 1, notes: 1, words: 'both', legal: 1, signature: 0, dueDate: 1, validity: 1, colsQty: 1, colsPu: 1, colsTva: 1, colsTotal: 1 };
     const doc = isQuote ? (data.quotes || []).find((q) => q.id === id) : (data.invoices || []).find((i) => i.id === id);
     if (!doc) throw new Error(I18N.tr(isQuote ? 'quo.notFound' : 'pi.notFound'));
 
@@ -133,14 +133,18 @@ const WM_TEXT = { paid: 'PAYÉE', draft: 'BROUILLON', quote: 'DEVIS / AR' };
       co.web ? esc(co.web) : ''
     ].filter(Boolean);
 
-    const idLines = [
-      co.ice ? 'ICE : ' + esc(co.ice) : '',
-      co.idFiscal ? 'IF : ' + esc(co.idFiscal) : '',
-      co.rc ? 'RC : ' + esc(co.rc) : '',
-      co.patente ? 'Patente : ' + esc(co.patente) : '',
-      co.cnss ? 'CNSS : ' + esc(co.cnss) : '',
-      co.tvaNumber ? 'TVA : ' + esc(co.tvaNumber) : ''
-    ].filter(Boolean);
+    /* Identifiants légaux : seuls ceux cochés dans les Paramètres sont affichés.
+       Chaque entrée : [clé de réglage, libellé, valeur]. */
+    const ID_DEFS = [
+      ['ice', 'ICE', co.ice],
+      ['if', 'IF', co.idFiscal],
+      ['rc', 'RC', co.rc],
+      ['patente', 'Patente', co.patente],
+      ['cnss', 'CNSS', co.cnss],
+      ['tva', 'TVA', co.tvaNumber]
+    ];
+    const shownIds = ID_DEFS.filter((e) => (b.ids ? b.ids[e[0]] : true) && e[2]);
+    const idLines = shownIds.map((e) => e[1] + ' : ' + esc(e[2]));
 
     const clientLines = [
       (client && client.name) || doc.clientName || I18N.tr('common.noClient'),
@@ -269,7 +273,7 @@ const WM_TEXT = { paid: 'PAYÉE', draft: 'BROUILLON', quote: 'DEVIS / AR' };
             ${b.nameAr && co.nameAr ? `<div class="cname ar" dir="rtl">${esc(co.nameAr)}</div>` : ''}
             <div class="cname">${esc(coName)}</div>
             ${companyLines.map((l) => `<div class="cmeta">${l}</div>`).join('')}
-            ${b.companyIds ? idLines.map((l) => `<div class="cmeta id">${l}</div>`).join('') : ''}
+            ${idLines.map((l) => `<div class="cmeta id">${l}</div>`).join('')}
           </div>
           <div class="title">
             <div class="ar title-ar" dir="rtl">${titleAr}</div>
@@ -311,7 +315,7 @@ const WM_TEXT = { paid: 'PAYÉE', draft: 'BROUILLON', quote: 'DEVIS / AR' };
         ${paidBadge}
 
         <div class="footer">
-          ${b.legal ? `<div>${esc(coName)}${co.ice ? ' · ICE ' + esc(co.ice) : ''}${co.idFiscal ? ' · IF ' + esc(co.idFiscal) : ''}${co.rc ? ' · RC ' + esc(co.rc) : ''}${co.patente ? ' · Patente ' + esc(co.patente) : ''}${co.cnss ? ' · CNSS ' + esc(co.cnss) : ''}${co.tvaNumber ? ' · TVA ' + esc(co.tvaNumber) : ''}</div>` : ''}
+          ${b.legal ? `<div>${esc(coName)}${shownIds.length ? ' · ' + shownIds.map((e) => e[1] + ' ' + esc(e[2])).join(' · ') : ''}</div>` : ''}
           <div>${[co.email, co.phone, co.web].filter(Boolean).map(esc).join(' · ')}</div>
           ${(b.legal || (docConf && has(docConf.texts.footer))) && footFr ? `<div class="ftext">${esc(footFr)}</div>` : ''}
           ${footAr && b.legal ? `<div class="ar" dir="rtl">${esc(footAr)}</div>` : ''}

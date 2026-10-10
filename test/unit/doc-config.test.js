@@ -60,6 +60,20 @@ test('doc : modèle effectif par type de document (surcharge)', () => {
   assert.strictEqual(DOC.templateFor(d, 'quote'), 'modern');
 });
 
+test('doc : identifiants légaux — sélection individuelle + rétro-compatibilité', () => {
+  const d = DOC.normalize({ doc: { blocks: { ids: { ice: true, if: false, rc: false, patente: false, cnss: false, tva: false } } } });
+  assert.strictEqual(d.blocks.ids.ice, true);
+  assert.strictEqual(d.blocks.ids['if'], false);
+  assert.strictEqual(d.blocks.ids.tva, false);
+  /* Ancien réglage global `companyIds` : conservé comme valeur de repli. */
+  const off = DOC.normalize({ doc: { blocks: { companyIds: false } } });
+  assert.strictEqual(off.blocks.ids.ice, false);
+  assert.strictEqual(off.blocks.ids.tva, false);
+  const on = DOC.normalize({ doc: { blocks: { companyIds: true } } });
+  assert.strictEqual(on.blocks.ids.ice, true);
+  assert.strictEqual(on.blocks.ids.cnss, true);
+});
+
 test('doc : couleur personnalisée invalide → défaut', () => {
   const d = DOC.normalize({ doc: { accent: 'custom', accentColor: 'bleu' } });
   assert.strictEqual(d.accentColor, DOC.DEFAULT.accentColor);

@@ -203,7 +203,7 @@ ipcMain.handle('export:close-period', async (event, period) => {
   const pack = exportPack.buildPack(storeStub, {
     from: period && period.from,
     to: period && period.to,
-    appVersion: '1.17'
+    appVersion: '1.18'
   });
   const zipPath = path.join(__dirname, '.tmp', pack.base + '_cloture.zip');
   fs.writeFileSync(zipPath, exportPack.zipBuffer(pack.files));
@@ -211,7 +211,7 @@ ipcMain.handle('export:close-period', async (event, period) => {
 });
 
 /* Version de l'application (lue dans package.json par le vrai main.js) */
-ipcMain.handle('app:version', () => '1.17');
+ipcMain.handle('app:version', () => '1.18');
 
 function check(name, cond, detail) {
   if (cond) console.log('  ok   ' + name);
@@ -275,7 +275,7 @@ async function phaseUi() {
   check('logo posé sur fond blanc (lisibilité sur la sidebar bleue)',
     base.brandBg === 'rgb(255, 255, 255)', base.brandBg);
   check('favicon Icon.png déclaré', /Icon\.png/.test(base.favicon || ''), base.favicon);
-  check('version affichée dans la sidebar (v1.17)', base.version === 'v1.17', base.version);
+  check('version affichée dans la sidebar (v1.18)', base.version === 'v1.18', base.version);
   check('tableau de bord rempli', base.dashRendered);
   check('parseur CSV', !base.csvError && base.csv && base.csv.length === 3 &&
     base.csv[0].amount === 1200.5 && base.csv[1].amount === -25.5 && base.csv[2].amount === 34.99, base.csv || base.csvError);
@@ -2546,12 +2546,48 @@ async function phaseDocModel(win) {
   const qid0 = await ev(win, `state.quotes[0] ? state.quotes[0].id : ''`);
   if (!hasInv) { check('modèle doc : facture disponible', false, 'aucune facture'); return; }
 
+  /* (a) Réglage appliqué IMMÉDIATEMENT via l'interface (sans passer par le
+     bouton « Enregistrer les paramètres ») : on décoche « bloc client ». */
+  await ev(win, `(function () {
+    const c = document.querySelector('#doc-clientids');
+    c.checked = false;
+    c.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  })()`);
+  await wait(600);
+  const uiSave = await ev(win, `(async function () {
+    const s = await window.factapi.storeGet();
+    return { live: !!(state.settings.doc && state.settings.doc.blocks && state.settings.doc.blocks.clientIds),
+      saved: !!(s.settings.doc && s.settings.doc.blocks && s.settings.doc.blocks.clientIds) };
+  })()`);
+  check('modèle doc : réglage appliqué immédiatement (sans « Enregistrer »)',
+    uiSave.live === false && uiSave.saved === false, uiSave);
+
+  /* (b) Garde-fou : masquer un identifiant légal RENSEIGNÉ (ICE) doit afficher
+     un avertissement de conformité. On le rétablit ensuite. */
+  await ev(win, `(function () {
+    const c = document.querySelector('#doc-id-ice');
+    c.checked = false; c.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  })()`);
+  await wait(200);
+  const warnShown = await ev(win, `!document.querySelector('#doc-ids-warn').hidden`);
+  check('modèle doc : avertissement si un identifiant renseigné est masqué', warnShown === true, warnShown);
+  await ev(win, `(function () {
+    const c = document.querySelector('#doc-id-ice');
+    c.checked = true; c.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  })()`);
+  await wait(200);
+  const warnHidden = await ev(win, `document.querySelector('#doc-ids-warn').hidden`);
+  check('modèle doc : avertissement masqué quand tous les identifiants sont affichés', warnHidden === true, warnHidden);
+
   await ev(win, `(async function () {
     state.settings.doc = {
       template: 'modern', accent: 'green', accentColor: '#123456',
       paper: 'A5', margins: 'wide', density: 'compact', font: 'serif',
       watermark: 'draft', bilingual: 'fr',
-      blocks: { logo: true, nameAr: true, companyIds: true, clientIds: false,
+      blocks: { logo: true, nameAr: true, ids: { ice: true, if: false, rc: false, patente: true, cnss: true, tva: true }, clientIds: false,
         tvaDetail: false, regime: false, rib: false, notes: true, words: 'none',
         legal: true, signature: true, dueDate: false, validity: true,
         colsQty: false, colsPu: false, colsTva: true, colsTotal: true },
@@ -2581,6 +2617,7 @@ async function phaseDocModel(win) {
       footer: document.body.textContent.indexOf('PIED TEST') !== -1,
       signature: document.querySelectorAll('.signature').length,
       wm: (document.querySelector('.wm span') || {}).textContent || '',
+      ids: Array.from(document.querySelectorAll('.company .cmeta.id')).map(function (e) { return e.textContent; }).join(' | '),
       arHidden: arTitle ? getComputedStyle(arTitle).display === 'none' : false,
       title: (document.querySelector('.title h1') || {}).textContent || ''
     };
@@ -2600,6 +2637,9 @@ async function phaseDocModel(win) {
   check('modèle doc : bloc signature affiché', d.signature === 1, d.signature);
   check('modèle doc : filigrane « BROUILLON »', d.wm === 'BROUILLON', d.wm);
   check('modèle doc : arabe masqué en mode « français seulement »', d.arHidden === true, d.arHidden);
+  check('modèle doc : identifiants légaux sélectionnés individuellement',
+    /ICE\s*:/.test(d.ids) && /Patente\s*:/.test(d.ids) && /CNSS\s*:/.test(d.ids) &&
+    !/IF\s*:/.test(d.ids) && !/RC\s*:/.test(d.ids), d.ids);
 
   if (hasQuote) {
     const qid = qid0;

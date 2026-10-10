@@ -3156,7 +3156,12 @@ function renderDocSettings() {
   set('doc-words', dc.blocks.words);
   chk('doc-logo', dc.blocks.logo);
   chk('doc-namear', dc.blocks.nameAr);
-  chk('doc-companyids', dc.blocks.companyIds);
+  chk('doc-id-ice', dc.blocks.ids.ice);
+  chk('doc-id-if', dc.blocks.ids['if']);
+  chk('doc-id-rc', dc.blocks.ids.rc);
+  chk('doc-id-patente', dc.blocks.ids.patente);
+  chk('doc-id-cnss', dc.blocks.ids.cnss);
+  chk('doc-id-tva', dc.blocks.ids.tva);
   chk('doc-clientids', dc.blocks.clientIds);
   chk('doc-tvadetail', dc.blocks.tvaDetail);
   chk('doc-regime', dc.blocks.regime);
@@ -3176,6 +3181,24 @@ function renderDocSettings() {
   /* la couleur personnalisée n'est utile que si l'accent « custom » est choisi */
   const cc = $('#doc-accent-color');
   if (cc) cc.disabled = (dc.accent !== 'custom');
+  updateDocIdsWarn();
+}
+
+/* Affiche un avertissement lorsqu'un identifiant légal RENSEIGNÉ est masqué
+   (garde-fou de conformité : ICE / IF / RC / CNSS / TVA). */
+function updateDocIdsWarn() {
+  const el = $('#doc-ids-warn');
+  if (!el) return;
+  const co = state.settings.company || {};
+  const map = [
+    ['doc-id-ice', co.ice], ['doc-id-if', co.idFiscal], ['doc-id-rc', co.rc],
+    ['doc-id-patente', co.patente], ['doc-id-cnss', co.cnss], ['doc-id-tva', co.tvaNumber]
+  ];
+  const hidden = map.some(([id, value]) => {
+    const c = $('#' + id);
+    return c && !c.checked && String(value || '').trim();
+  });
+  el.hidden = !hidden;
 }
 
 /* Lit le formulaire du modèle de documents et renvoie un objet normalisé. */
@@ -3199,7 +3222,14 @@ function readDocSettings() {
       blocks: {
         logo: box('doc-logo'),
         nameAr: box('doc-namear'),
-        companyIds: box('doc-companyids'),
+        ids: {
+          ice: box('doc-id-ice'),
+          if: box('doc-id-if'),
+          rc: box('doc-id-rc'),
+          patente: box('doc-id-patente'),
+          cnss: box('doc-id-cnss'),
+          tva: box('doc-id-tva')
+        },
         clientIds: box('doc-clientids'),
         tvaDetail: box('doc-tvadetail'),
         regime: box('doc-regime'),
@@ -3224,6 +3254,23 @@ function readDocSettings() {
   });
 }
 
+/* Applique immédiatement le modèle de document : lit le formulaire, met à jour
+   l'état et persiste. Évite de dépendre du bouton « Enregistrer les paramètres »
+   situé dans une autre carte (cause d'un réglage non appliqué aux factures). */
+let docSaveTimer = null;
+function applyDocSettings(opts) {
+  const dc = readDocSettings();
+  if (!dc) return;
+  state.settings.doc = dc;
+  updateDocIdsWarn();
+  if (opts && opts.immediate) {
+    if (docSaveTimer) { clearTimeout(docSaveTimer); docSaveTimer = null; }
+    return persist('settings');
+  }
+  if (docSaveTimer) clearTimeout(docSaveTimer);
+  docSaveTimer = setTimeout(() => { docSaveTimer = null; persist('settings'); }, 400);
+}
+
 /* Active/désactive la pipette selon le choix « couleur personnalisée ». */
 const docAccentSel = $('#doc-accent');
 if (docAccentSel) {
@@ -3233,23 +3280,36 @@ if (docAccentSel) {
   });
 }
 
-/* Réinitialiser le modèle aux valeurs par défaut (sans enregistrer). */
+/* Réglages « live » : toute modification de la carte est enregistrée aussitôt
+   (immédiat pour les listes/cases, différé de 400 ms pour les zones de texte). */
+const cardDoc = $('#card-doc');
+if (cardDoc) {
+  cardDoc.querySelectorAll('select, input[type="checkbox"]').forEach((el) => {
+    el.addEventListener('change', () => applyDocSettings({ immediate: true }));
+  });
+  cardDoc.querySelectorAll('textarea, input[type="color"]').forEach((el) => {
+    el.addEventListener('input', () => applyDocSettings());
+  });
+}
+
+/* Réinitialiser le modèle aux valeurs par défaut. */
 const btnResetDoc = $('#btn-reset-doc');
 if (btnResetDoc) {
   btnResetDoc.addEventListener('click', () => {
     if (typeof DOC === 'undefined') return;
     state.settings.doc = JSON.parse(JSON.stringify(DOC.DEFAULT));
     renderDocSettings();
+    applyDocSettings({ immediate: true });
     toast(tr('set.docReset'), 'success');
   });
 }
 
-/* Aperçu : ouvre la dernière facture (sinon le dernier devis) avec le
-   modèle ENREGISTRÉ (l'enregistrement se fait via « Enregistrer les
-   paramètres »). */
+/* Aperçu : enregistre d'abord le réglage courant, puis ouvre la dernière
+   facture (sinon le dernier devis) avec ce modèle. */
 const btnPreviewDoc = $('#btn-preview-doc');
 if (btnPreviewDoc) {
   btnPreviewDoc.addEventListener('click', async () => {
+    await applyDocSettings({ immediate: true });
     const inv = (state.invoices || []).slice().sort((a, b) => String(b.issueDate || '').localeCompare(String(a.issueDate || '')))[0];
     const q = (state.quotes || []).slice().sort((a, b) => String(b.issueDate || '').localeCompare(String(a.issueDate || '')))[0];
     if (inv) { await window.factapi.previewInvoice(inv.id); return; }
