@@ -1,0 +1,401 @@
+/* ===================================================================
+   MAZ-FATORA — feuille de style des documents (facture / devis)
+
+   Un seul rendu (print-doc.js) + cette feuille = tous les modèles,
+   toutes les couleurs, tous les formats. La couleur d'accent est
+   injectée en ligne (style="--accent: #rrggbb") ; les teintes dérivées
+   sont calculées ici avec color-mix().
+
+   Le modèle « classic » reproduit à l'identique le document historique.
+   =================================================================== */
+
+* { box-sizing: border-box; }
+
+:root {
+  --accent: #2563eb;
+  --accent-2: color-mix(in srgb, var(--accent) 78%, #000);
+  --accent-3: color-mix(in srgb, var(--accent) 52%, #fff);
+  --accent-soft: color-mix(in srgb, var(--accent) 8%, #fff);
+  --accent-line: color-mix(in srgb, var(--accent) 42%, #e2e8f0);
+  --ink: #0f172a;
+  --soft: #475569;
+  --muted: #64748b;
+  --line: #e2e8f0;
+  --panel: #f8fafc;
+}
+
+/* ---- Aperçu (écran) ---- */
+body {
+  margin: 0;
+  background: #e9edf3;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: var(--ink);
+  font-size: 12.5px;
+}
+
+.toolbar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding: 11px 18px;
+  background: #0f172a;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, .25);
+  z-index: 10;
+}
+.toolbar button {
+  font: inherit;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 9px;
+  border: 1px solid #334155;
+  background: #1e293b;
+  color: #fff;
+  cursor: pointer;
+  transition: background .15s ease;
+}
+.toolbar button:hover { background: #334155; }
+.toolbar button.primary { background: #2563eb; border-color: #2563eb; }
+.toolbar button.primary:hover { background: #1d4ed8; }
+.toolbar .spacer { margin-right: auto; color: #94a3b8; font-size: 13px; align-self: center; font-weight: 700; }
+
+/* ---- Feuille ---- */
+.sheet {
+  position: relative;
+  width: 210mm;
+  min-height: 297mm;
+  margin: 20px auto;
+  background: #fff;
+  padding: 16mm 15mm 18mm;
+  box-shadow: 0 6px 30px rgba(0, 0, 0, .2);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+  overflow: hidden;
+}
+/* Bandeau de signature en tête de document */
+.sheet::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 6px;
+  background: linear-gradient(90deg, var(--accent-2) 0%, var(--accent) 70%, var(--accent-3) 100%);
+}
+
+/* ---- Marges ---- */
+.sheet.m-narrow { padding: 11mm 10mm 13mm; }
+.sheet.m-wide   { padding: 22mm 20mm 24mm; }
+
+/* ---- Formats ---- */
+.sheet.paper-A5 { width: 148mm; min-height: 210mm; font-size: 11px; }
+
+/* ---- Police ---- */
+.sheet.f-serif { font-family: Georgia, "Times New Roman", "Geeza Pro", serif; }
+.sheet.f-serif .ar { font-family: "Geeza Pro", "Noto Naskh Arabic", "Traditional Arabic", "Times New Roman", serif; }
+
+/* ---- Densité ---- */
+.sheet.d-compact { font-size: 11.5px; }
+.sheet.d-compact table.lines td { padding: 5px 9px; }
+.sheet.d-compact .head { margin-bottom: 15px; }
+.sheet.d-compact table.lines th { padding: 6px 9px; }
+.sheet.d-airy { font-size: 13px; }
+.sheet.d-airy table.lines td { padding: 13px 11px; }
+.sheet.d-airy .head { margin-bottom: 30px; }
+
+/* ---- En-tête : société (gauche) / titre + méta (droite) ---- */
+.head { display: flex; justify-content: space-between; gap: 28px; margin-bottom: 24px; }
+.company { font-size: 12.5px; line-height: 1.5; }
+.company .logo { display: block; max-height: 72px; max-width: 220px; object-fit: contain; margin-bottom: 9px; }
+.company .cname { font-size: 19px; font-weight: 800; letter-spacing: -.2px; margin-bottom: 5px; }
+.company .cmeta { color: var(--soft); }
+.company .cmeta.id { color: var(--ink); font-weight: 600; }
+
+.title { text-align: right; }
+.title h1 {
+  margin: 0;
+  font-size: 30px;
+  letter-spacing: 4px;
+  font-weight: 900;
+  color: var(--ink);
+  border-bottom: 3px solid var(--accent);
+  padding-bottom: 6px;
+  display: inline-block;
+}
+.title .title-ar { font-size: 24px; font-weight: 700; line-height: 1.2; }
+.title .num { font-size: 15px; font-weight: 700; color: var(--accent); margin-top: 6px; }
+
+/* Libellés bilingues */
+.ar { font-family: "Geeza Pro", "Noto Naskh Arabic", "Traditional Arabic", "Times New Roman", serif; }
+[dir="rtl"] { unicode-bidi: isolate; }
+.lbl .ar { text-transform: none; letter-spacing: normal; font-size: 12px; }
+.lbl .fr { font-weight: 700; }
+
+/* Boîte méta encadrée */
+table.meta {
+  margin-left: auto;
+  border-collapse: collapse;
+  margin-top: 12px;
+  font-size: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--panel);
+}
+table.meta td { padding: 5px 10px 5px 12px; white-space: nowrap; }
+table.meta td.ar { font-size: 12.5px; }
+table.meta td.fr { color: var(--soft); font-size: 11px; text-transform: uppercase; letter-spacing: .4px; }
+table.meta td.v { font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+
+th.bi { padding-top: 7px; padding-bottom: 7px; }
+th.bi .ar {
+  display: block;
+  font-size: 10.5px;
+  letter-spacing: normal;
+  text-transform: none;
+  font-weight: 600;
+  opacity: .9;
+}
+th.bi .fr { display: block; font-size: 10px; }
+
+/* ---- Bloc client ---- */
+.parties { display: flex; justify-content: space-between; gap: 28px; margin-bottom: 22px; }
+.client-box {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-inline-start: 4px solid var(--accent);
+  border-radius: 10px;
+  padding: 12px 14px;
+  min-width: 250px;
+  line-height: 1.55;
+}
+.lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .8px; color: var(--accent); font-weight: 800; margin-bottom: 6px; }
+.client-box .cname { font-weight: 700; font-size: 14px; }
+.client-box .cmeta { color: var(--soft); }
+
+/* ---- Lignes ---- */
+table.lines { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+table.lines th {
+  background: linear-gradient(180deg, #1e293b, #0f172a);
+  color: #fff;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 3px solid var(--accent);
+}
+table.lines th.num, table.lines td.num { text-align: right; }
+table.lines td { padding: 9px 10px; border-bottom: 1px solid var(--line); }
+table.lines tr:nth-child(even) td { background: var(--panel); }
+table.lines tbody tr:last-child td { border-bottom: 2px solid var(--ink); }
+td.num, th.num { font-variant-numeric: tabular-nums; }
+
+/* ---- Bas de page : notes + totaux ---- */
+.bottom { display: flex; justify-content: space-between; gap: 28px; margin-top: 12px; }
+.notes { flex: 1; color: var(--soft); line-height: 1.55; font-size: 11.5px; }
+
+/* Mention libre en tête de document */
+.doc-note { margin-bottom: 12px; color: var(--soft); font-size: 11.5px; white-space: pre-line; }
+
+/* Validité (devis) + statut converti */
+.validity {
+  margin-top: 14px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  border-inline-start: 3px solid var(--accent);
+  border-radius: 8px;
+  padding: 9px 12px;
+  color: var(--accent-2);
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.validity .ar { font-size: 12.5px; font-weight: 600; }
+
+/* Montant en toutes lettres */
+.words {
+  margin-top: 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-inline-start: 3px solid #94a3b8;
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #334155;
+  line-height: 1.6;
+}
+.words .ar-line { font-size: 13.5px; margin-top: 6px; }
+.words .fr-line { font-size: 12.5px; margin-top: 2px; }
+.regime { margin-top: 10px; font-size: 11px; color: var(--soft); }
+.regime .ar { font-size: 12px; }
+
+.notes .mentions { margin-top: 12px; font-size: 10.5px; color: var(--muted); }
+
+/* Signature / cachet */
+.signature { margin-top: 18px; }
+.signature .sig-line { margin-top: 26px; border-top: 1px solid #94a3b8; width: 190px; padding-top: 4px; font-size: 10.5px; color: var(--muted); }
+
+.totals {
+  min-width: 255px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--panel);
+  padding: 6px 0;
+  align-self: flex-start;
+}
+.totals .row { display: flex; justify-content: space-between; padding: 7px 12px; font-size: 12.5px; }
+.totals .row span:last-child { font-variant-numeric: tabular-nums; font-weight: 600; }
+.totals .row .tl span { display: block; }
+.totals .row .tl .ar { font-size: 12.5px; }
+.totals .row .tl .fr { font-size: 11px; opacity: .85; }
+.totals .row.grand {
+  background: linear-gradient(180deg, #1e293b, #0f172a);
+  color: #fff;
+  padding: 11px 12px;
+  margin-top: 6px;
+  font-size: 16px;
+  font-weight: 800;
+  border-top: 3px solid var(--accent);
+}
+.totals .row.grand .tl .fr { opacity: .9; }
+
+/* ---- Bandeau « acquitté » (facture payée) ---- */
+.badge-paid {
+  display: block;
+  width: fit-content;
+  margin: 4mm auto 3mm;
+  background: linear-gradient(180deg, rgba(220, 252, 231, .16), rgba(220, 252, 231, .55));
+  border: 2.5px solid #15803d;
+  color: #15803d;
+  font-weight: 900;
+  font-size: 17px;
+  letter-spacing: 2.5px;
+  padding: 5px 22px;
+  border-radius: 10px;
+  transform: rotate(-3deg);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.badge-paid .ar { font-weight: 700; font-size: 14px; }
+
+/* ---- Pied de facture : bande légale ---- */
+.footer {
+  margin-top: 32px;
+  padding-top: 12px;
+  border-top: 3px double #94a3b8;
+  color: var(--soft);
+  font-size: 10.5px;
+  line-height: 1.6;
+  text-align: center;
+}
+.footer .ar { font-size: 11.5px; }
+.footer .ftext { white-space: pre-line; }
+
+/* ---- Filigrane ---- */
+.wm {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 0;
+}
+.wm span {
+  font-size: 96px;
+  font-weight: 900;
+  letter-spacing: 10px;
+  transform: rotate(-28deg);
+  color: rgba(15, 23, 42, .06);
+  border: 6px solid rgba(15, 23, 42, .06);
+  padding: 8px 36px;
+  border-radius: 16px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.wm.wm-paid span { color: rgba(21, 128, 61, .1); border-color: rgba(21, 128, 61, .1); }
+.sheet > *:not(.wm) { position: relative; z-index: 1; }
+
+/* ---- Langues affichées ---- */
+.sheet.b-fr .ar, .sheet.b-fr .title-ar, .sheet.b-fr .ar-line { display: none !important; }
+.sheet.b-ar .fr, .sheet.b-ar .fr-line { display: none !important; }
+.sheet.b-ar .title h1 { display: none; }
+.sheet.b-ar .title .title-ar { font-size: 32px; }
+.sheet.b-ar .lbl .ar { font-size: 13px; }
+
+/* =====================  MODÈLES DE DISPOSITION  ===================== */
+
+/* ---- MODERNE : bandeau accent pleine largeur + cartes épurées ---- */
+.sheet.t-modern::before { height: 16px; }
+.sheet.t-modern .head {
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  color: #fff;
+  margin: -16mm -15mm 26px;
+  padding: 22px 15mm 20px;
+}
+.sheet.t-modern .company .cmeta,
+.sheet.t-modern .company .cmeta.id { color: rgba(255, 255, 255, .9); }
+.sheet.t-modern .company .cname { color: #fff; }
+.sheet.t-modern .title h1 { color: #fff; border-bottom-color: rgba(255, 255, 255, .55); }
+.sheet.t-modern .title .title-ar { color: rgba(255, 255, 255, .92); }
+.sheet.t-modern table.meta { border: 1px solid rgba(255, 255, 255, .4); background: rgba(255, 255, 255, .12); }
+.sheet.t-modern table.meta td { color: #fff; }
+.sheet.t-modern table.meta td.fr { color: rgba(255, 255, 255, .8); }
+.sheet.t-modern table.meta td.v { color: #fff; }
+.sheet.t-modern .client-box { border: none; border-top: 3px solid var(--accent); border-radius: 4px; background: var(--panel); }
+.sheet.t-modern table.lines th { background: var(--accent); border-bottom: none; }
+.sheet.t-modern .totals { border: none; border-top: 3px solid var(--accent); border-radius: 4px; }
+.sheet.t-modern .totals .row.grand { background: var(--accent); border-top: none; }
+
+/* ---- MINIMALISTE : noir & blanc, filets fins, sans fonds ---- */
+.sheet.t-minimal::before { background: #111827; height: 3px; }
+.sheet.t-minimal .company .cmeta, .sheet.t-minimal .company .cmeta.id { color: #111827; }
+.sheet.t-minimal .title .title-ar { color: #111827; }
+.sheet.t-minimal .title h1 { border-bottom: 1px solid #111827; letter-spacing: 6px; }
+.sheet.t-minimal table.meta { border: none; border-radius: 0; background: transparent; }
+.sheet.t-minimal table.meta td { padding: 2px 8px 2px 0; }
+.sheet.t-minimal table.meta td.fr { color: #6b7280; }
+.sheet.t-minimal .client-box { background: transparent; border: none; border-left: 1px solid #111827; border-radius: 0; padding: 2px 0 2px 12px; }
+.sheet.t-minimal .lbl { color: #111827; }
+.sheet.t-minimal table.lines th { background: transparent; color: #111827; border-top: 2px solid #111827; border-bottom: 1px solid #111827; }
+.sheet.t-minimal table.lines tr:nth-child(even) td { background: transparent; }
+.sheet.t-minimal .words { background: transparent; border: none; border-top: 1px solid #d1d5db; border-radius: 0; }
+.sheet.t-minimal .totals { background: transparent; border: none; border-radius: 0; padding: 0; }
+.sheet.t-minimal .totals .row.grand { background: transparent; color: #111827; border-top: 2px solid #111827; border-bottom: 2px solid #111827; }
+.sheet.t-minimal .badge-paid { background: transparent; }
+.sheet.t-minimal .validity { background: transparent; border: 1px solid #111827; border-radius: 0; color: #111827; }
+
+/* ---- ÉLÉGANT : barre latérale accent + bloc société en colonne ---- */
+.sheet.t-elegant { padding-left: 26mm; }
+.sheet.t-elegant::before { height: 100%; width: 10px; left: 0; top: 0; bottom: 0; background: linear-gradient(180deg, var(--accent), var(--accent-2)); }
+.sheet.t-elegant .head { flex-direction: column; gap: 14px; }
+.sheet.t-elegant .title { text-align: left; }
+.sheet.t-elegant .title h1 { border-bottom: none; }
+.sheet.t-elegant .title .title-ar { color: var(--accent-2); }
+.sheet.t-elegant table.meta { margin-left: 0; }
+.sheet.t-elegant .client-box { border-inline-start: none; border-top: 4px solid var(--accent); }
+.sheet.t-elegant .totals .row.grand { background: var(--accent); border-top: none; }
+
+/* ---- COMPACT : dense, pour nombreuses lignes ---- */
+.sheet.t-compact { padding: 12mm 11mm 14mm; font-size: 11px; }
+.sheet.t-compact .head { margin-bottom: 14px; }
+.sheet.t-compact .company .cname { font-size: 16px; }
+.sheet.t-compact .title h1 { font-size: 24px; letter-spacing: 2px; }
+.sheet.t-compact table.lines td { padding: 5px 8px; }
+.sheet.t-compact table.lines th { padding: 6px 8px; font-size: 10px; }
+.sheet.t-compact .parties { margin-bottom: 12px; }
+.sheet.t-compact .bottom { margin-top: 8px; }
+.sheet.t-compact .totals .row { padding: 5px 10px; font-size: 11.5px; }
+.sheet.t-compact .totals .row.grand { font-size: 14px; padding: 8px 10px; }
+.sheet.t-compact .words { padding: 7px 10px; }
+.sheet.t-compact .footer { margin-top: 18px; }
+
+@media print {
+  body { background: #fff; }
+  .toolbar { display: none !important; }
+  .sheet { margin: 0; box-shadow: none; width: auto; min-height: auto; padding: 0; }
+  .sheet.t-modern .head { margin: 0 0 22px; }
+  .sheet.t-elegant { padding-left: 10mm; }
+  .sheet.t-elegant::before { width: 6px; }
+  @page { size: A4; margin: 12mm; }
+}

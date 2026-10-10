@@ -1059,6 +1059,9 @@ function renderSettings() {
   const rmLogo = $('#btn-remove-logo');
   if (rmLogo) rmLogo.hidden = !(lg && lg.dataUri);
 
+  /* ---- Modèle des documents (factures & devis) ---- */
+  renderDocSettings();
+
   /* ---- Export comptable : période par défaut = mois précédent (clôture) ---- */
   const cf = $('#set-close-from');
   const ct = $('#set-close-to');
@@ -3130,6 +3133,131 @@ $('#desig-clients').addEventListener('change', async (e) => {
   await persist('clients');
 });
 
+/* ===================================================================
+   Modèle des documents (factures & devis) — Paramètres
+   Le schéma et la normalisation vivent dans doc-config.js (window.DOC).
+   =================================================================== */
+function renderDocSettings() {
+  if (typeof DOC === 'undefined') return;
+  const dc = DOC.normalize(state.settings);
+  const set = (id, val) => { const el = $('#' + id); if (el) el.value = val; };
+  const chk = (id, val) => { const el = $('#' + id); if (el) el.checked = !!val; };
+  set('doc-template', dc.template);
+  set('doc-accent', dc.accent);
+  set('doc-accent-color', dc.accentColor);
+  set('doc-paper', dc.paper);
+  set('doc-margins', dc.margins);
+  set('doc-density', dc.density);
+  set('doc-font', dc.font);
+  set('doc-bilingual', dc.bilingual);
+  set('doc-watermark', dc.watermark);
+  set('doc-invoice-template', dc.invoiceTemplate);
+  set('doc-quote-template', dc.quoteTemplate);
+  set('doc-words', dc.blocks.words);
+  chk('doc-logo', dc.blocks.logo);
+  chk('doc-namear', dc.blocks.nameAr);
+  chk('doc-companyids', dc.blocks.companyIds);
+  chk('doc-clientids', dc.blocks.clientIds);
+  chk('doc-tvadetail', dc.blocks.tvaDetail);
+  chk('doc-regime', dc.blocks.regime);
+  chk('doc-rib', dc.blocks.rib);
+  chk('doc-notes', dc.blocks.notes);
+  chk('doc-legal', dc.blocks.legal);
+  chk('doc-signature', dc.blocks.signature);
+  chk('doc-duedate', dc.blocks.dueDate);
+  chk('doc-validity', dc.blocks.validity);
+  chk('doc-colsqty', dc.blocks.colsQty);
+  chk('doc-colspu', dc.blocks.colsPu);
+  chk('doc-colstva', dc.blocks.colsTva);
+  chk('doc-colstotal', dc.blocks.colsTotal);
+  const th = $('#doc-header'); if (th) th.value = dc.texts.header;
+  const tt = $('#doc-terms'); if (tt) tt.value = dc.texts.terms;
+  const tf = $('#doc-footer'); if (tf) tf.value = dc.texts.footer;
+  /* la couleur personnalisée n'est utile que si l'accent « custom » est choisi */
+  const cc = $('#doc-accent-color');
+  if (cc) cc.disabled = (dc.accent !== 'custom');
+}
+
+/* Lit le formulaire du modèle de documents et renvoie un objet normalisé. */
+function readDocSettings() {
+  if (typeof DOC === 'undefined') return null;
+  const val = (id) => { const el = $('#' + id); return el ? el.value : ''; };
+  const box = (id) => { const el = $('#' + id); return el ? !!el.checked : false; };
+  return DOC.normalize({
+    doc: {
+      template: val('doc-template'),
+      accent: val('doc-accent'),
+      accentColor: val('doc-accent-color'),
+      paper: val('doc-paper'),
+      margins: val('doc-margins'),
+      density: val('doc-density'),
+      font: val('doc-font'),
+      bilingual: val('doc-bilingual'),
+      watermark: val('doc-watermark'),
+      invoiceTemplate: val('doc-invoice-template'),
+      quoteTemplate: val('doc-quote-template'),
+      blocks: {
+        logo: box('doc-logo'),
+        nameAr: box('doc-namear'),
+        companyIds: box('doc-companyids'),
+        clientIds: box('doc-clientids'),
+        tvaDetail: box('doc-tvadetail'),
+        regime: box('doc-regime'),
+        rib: box('doc-rib'),
+        notes: box('doc-notes'),
+        legal: box('doc-legal'),
+        signature: box('doc-signature'),
+        dueDate: box('doc-duedate'),
+        validity: box('doc-validity'),
+        colsQty: box('doc-colsqty'),
+        colsPu: box('doc-colspu'),
+        colsTva: box('doc-colstva'),
+        colsTotal: box('doc-colstotal'),
+        words: val('doc-words')
+      },
+      texts: {
+        header: (($('#doc-header') || {}).value || ''),
+        terms: (($('#doc-terms') || {}).value || ''),
+        footer: (($('#doc-footer') || {}).value || '')
+      }
+    }
+  });
+}
+
+/* Active/désactive la pipette selon le choix « couleur personnalisée ». */
+const docAccentSel = $('#doc-accent');
+if (docAccentSel) {
+  docAccentSel.addEventListener('change', () => {
+    const cc = $('#doc-accent-color');
+    if (cc) cc.disabled = (docAccentSel.value !== 'custom');
+  });
+}
+
+/* Réinitialiser le modèle aux valeurs par défaut (sans enregistrer). */
+const btnResetDoc = $('#btn-reset-doc');
+if (btnResetDoc) {
+  btnResetDoc.addEventListener('click', () => {
+    if (typeof DOC === 'undefined') return;
+    state.settings.doc = JSON.parse(JSON.stringify(DOC.DEFAULT));
+    renderDocSettings();
+    toast(tr('set.docReset'), 'success');
+  });
+}
+
+/* Aperçu : ouvre la dernière facture (sinon le dernier devis) avec le
+   modèle ENREGISTRÉ (l'enregistrement se fait via « Enregistrer les
+   paramètres »). */
+const btnPreviewDoc = $('#btn-preview-doc');
+if (btnPreviewDoc) {
+  btnPreviewDoc.addEventListener('click', async () => {
+    const inv = (state.invoices || []).slice().sort((a, b) => String(b.issueDate || '').localeCompare(String(a.issueDate || '')))[0];
+    const q = (state.quotes || []).slice().sort((a, b) => String(b.issueDate || '').localeCompare(String(a.issueDate || '')))[0];
+    if (inv) { await window.factapi.previewInvoice(inv.id); return; }
+    if (q) { await window.factapi.quotePreview(q.id); return; }
+    toast(tr('set.docNoDoc'), 'info');
+  });
+}
+
 $('#btn-save-settings').addEventListener('click', async () => {
   /* Nom de société = nom du client de la licence (figé) quand elle est active. */
   const licName = licState.configured && licState.customer ? licState.customer : '';
@@ -3169,6 +3297,9 @@ $('#btn-save-settings').addEventListener('click', async () => {
       ? (state.settings.invoiceStart || 1)
       : Math.max(1, Math.floor(Number(startNum.value) || 1));
   }
+  /* Modèle des documents (factures & devis) */
+  const dcNew = readDocSettings();
+  if (dcNew) state.settings.doc = dcNew;
   await persist('settings');
   applyTheme();
   renderAll();

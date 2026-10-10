@@ -230,10 +230,19 @@ function ipcWindow(event) {
 
 async function printToPdf(win) {
   if (!win || win.isDestroyed()) throw new Error(I18N.tr('main.renderTimeout'));
+  /* Format / marges du PDF d'après le « Modèle des documents » choisi.
+     Le schéma complet vit dans src/renderer/doc-config.js ; côté processus
+     principal on se contente de lire les quelques champs utiles. */
+  let doc = null;
+  try { const all = store && store.loadAll(); doc = all && all.settings && all.settings.doc; } catch (e) { /* valeurs par défaut */ }
+  const pageSize = (doc && doc.paper === 'A5') ? 'A5' : 'A4';
+  const m = (doc && doc.margins) || 'normal';
+  const side = m === 'narrow' ? 0.25 : (m === 'wide' ? 0.6 : 0.4);
+  const vert = m === 'narrow' ? 0.25 : (m === 'wide' ? 0.6 : 0.35);
   return win.webContents.printToPDF({
     printBackground: true,
-    pageSize: 'A4',
-    margins: { top: 0.35, bottom: 0.35, left: 0.4, right: 0.4 }
+    pageSize,
+    margins: { top: vert, bottom: vert, left: side, right: side }
   });
 }
 

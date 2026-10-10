@@ -47,10 +47,37 @@ npm test
 
 ## Version
 
-La **version** s'affiche en bas de la barre latérale (ex. `v1.16`). À **chaque modification** du
+La **version** s'affiche en bas de la barre latérale (ex. `v1.17`). À **chaque modification** du
 projet, le champ `version` de `package.json` est incrémenté par la **partie mineure**
 (`1.0` → `1.1` → `1.2` …) et l'application affiche `major.minor`. Les noms d'installateurs
-reprennent la version complète (`1.16.0`).
+reprennent la version complète (`1.17.0`).
+
+## v1.17 — Modèle des documents personnalisable (PDF factures & devis)
+
+Nouvelle carte **« Modèle des documents »** dans *Paramètres* : l'apparence des PDF
+(factures et devis) se règle sans toucher au code. Le rendu est désormais un **moteur
+unique** (`print-doc.js` + `print-doc.css`) piloté par `settings.doc`, et le **modèle par
+défaut reproduit à l'identique** le document historique.
+
+- **5 modèles de disposition** : *Classique* (historique), *Moderne* (bandeau accent),
+  *Minimaliste* (noir & blanc), *Élégant à bande*, *Compact*. Modèles **distincts
+  facture / devis** possibles ;
+- **Couleur d'accent** : automatique (facture bleue / devis sarcelle), 7 palettes
+  (bleu, vert, ardoise, bordeaux, sarcelle, ambre, noir & blanc) ou **couleur
+  personnalisée** ;
+- **Format** : A4 / A5, **marges** étroites / normales / larges, **densité** et **police**
+  (avec ou sans empattement) ;
+- **Informations affichées** (cases à cocher) : logo, nom arabe, identifiants de la
+  société (ICE/IF/RC/Patente/CNSS/TVA), bloc client, TVA détaillée par taux, régime de
+  TVA, RIB, notes, mentions légales, bloc **signature/cachet**, **échéance** (facture),
+  **validité** (devis) et le choix des **colonnes** de lignes (Qté, P.U., TVA, Total HT) ;
+- **Montant en toutes lettres** : français + arabe, français seul, arabe seul, ou aucun ;
+- **Langues affichées** : bilingue, français seul, ou **arabe seul** (document en RTL) ;
+- **Filigrane** : aucun, « PAYÉE », « BROUILLON », « DEVIS » ;
+- **Textes libres** : en-tête, conditions de règlement et pied de page personnalisés
+  (remplacent les mentions par défaut) ;
+- **Aperçu** du dernier document et **réinitialisation** du modèle. Avertissement
+  lorsque les identifiants légaux sont masqués (risque de non-conformité).
 
 ## v1.16 — Comptabilisation des factures (numérotation continue)
 
@@ -439,7 +466,12 @@ src/
     app.js              Logique applicative (import, génération, factures, paiements, sauvegarde)
     csv.js              Parseur de relevés CSV (MAD / DH / €)
     words.js            Montant en toutes lettres — français (dirhams) et arabe
-    print-invoice.*     Rendu de la facture A4 bilingue FR / AR (impression / PDF)
+    doc-config.js       Configuration des documents : schéma `settings.doc`, normalisation,
+                        modèles, palettes, formats (partagé app ⇄ impression)
+    print-doc.css       Styles des documents : modèles, couleurs, densité, filigrane, RTL
+    print-doc.js        Moteur de rendu unique des documents (facture OU devis)
+    print-invoice.*     Entrée impression FACTURE (type + moteur partagé)
+    print-quote.*       Entrée impression DEVIS (type + moteur partagé)
 test/
   smoke.js              npm test : UI + langue FR/AR + facture bilingue + facture manuelle,
                         paiements, sauvegarde/restauration + extraction PDF,

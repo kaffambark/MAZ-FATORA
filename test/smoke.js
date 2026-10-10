@@ -203,7 +203,7 @@ ipcMain.handle('export:close-period', async (event, period) => {
   const pack = exportPack.buildPack(storeStub, {
     from: period && period.from,
     to: period && period.to,
-    appVersion: '1.16'
+    appVersion: '1.17'
   });
   const zipPath = path.join(__dirname, '.tmp', pack.base + '_cloture.zip');
   fs.writeFileSync(zipPath, exportPack.zipBuffer(pack.files));
@@ -211,7 +211,7 @@ ipcMain.handle('export:close-period', async (event, period) => {
 });
 
 /* Version de l'application (lue dans package.json par le vrai main.js) */
-ipcMain.handle('app:version', () => '1.16');
+ipcMain.handle('app:version', () => '1.17');
 
 function check(name, cond, detail) {
   if (cond) console.log('  ok   ' + name);
@@ -275,7 +275,7 @@ async function phaseUi() {
   check('logo posé sur fond blanc (lisibilité sur la sidebar bleue)',
     base.brandBg === 'rgb(255, 255, 255)', base.brandBg);
   check('favicon Icon.png déclaré', /Icon\.png/.test(base.favicon || ''), base.favicon);
-  check('version affichée dans la sidebar (v1.16)', base.version === 'v1.16', base.version);
+  check('version affichée dans la sidebar (v1.17)', base.version === 'v1.17', base.version);
   check('tableau de bord rempli', base.dashRendered);
   check('parseur CSV', !base.csvError && base.csv && base.csv.length === 3 &&
     base.csv[0].amount === 1200.5 && base.csv[1].amount === -25.5 && base.csv[2].amount === 34.99, base.csv || base.csvError);
@@ -2529,6 +2529,95 @@ async function phaseComptabilisation(win) {
       log: persisted.meta.accountingLog && persisted.meta.accountingLog.length });
 }
 
+/* ---- PHASE 1g : MODÈLE DES DOCUMENTS (v1.17) ----
+   Vérifie qu'un modèle non-défaut change bien le rendu : classes de modèle,
+   couleur d'accent, format, blocs masqués, textes libres et modèle de devis
+   séparé. À la fin, aucune donnée n'est laissée dans un état gênant (dernière
+   phase exécutée). */
+async function phaseDocModel(win) {
+  console.log('--- PHASE 1g : MODÈLE DES DOCUMENTS (v1.17) ---');
+
+  await win.loadFile(path.join(__dirname, '..', 'src', 'renderer', 'index.html'));
+  await wait(900);
+
+  const hasInv = await ev(win, `state.invoices.length > 0`);
+  const hasQuote = await ev(win, `state.quotes.length > 0`);
+  const invId0 = await ev(win, `state.invoices[0] ? state.invoices[0].id : ''`);
+  const qid0 = await ev(win, `state.quotes[0] ? state.quotes[0].id : ''`);
+  if (!hasInv) { check('modèle doc : facture disponible', false, 'aucune facture'); return; }
+
+  await ev(win, `(async function () {
+    state.settings.doc = {
+      template: 'modern', accent: 'green', accentColor: '#123456',
+      paper: 'A5', margins: 'wide', density: 'compact', font: 'serif',
+      watermark: 'draft', bilingual: 'fr',
+      blocks: { logo: true, nameAr: true, companyIds: true, clientIds: false,
+        tvaDetail: false, regime: false, rib: false, notes: true, words: 'none',
+        legal: true, signature: true, dueDate: false, validity: true,
+        colsQty: false, colsPu: false, colsTva: true, colsTotal: true },
+      texts: { header: 'ENTETE TEST', terms: 'TERMES TEST', footer: 'PIED TEST' },
+      invoiceTemplate: '', quoteTemplate: 'elegant'
+    };
+    await persist('settings');
+    return true;
+  })()`);
+
+  const invId = invId0;
+  await win.loadFile(path.join(__dirname, '..', 'src', 'renderer', 'print-invoice.html'), { query: { id: invId } });
+  await wait(800);
+  const d = await ev(win, `(function () {
+    const sheet = document.querySelector('.sheet');
+    const arTitle = document.querySelector('.title-ar');
+    return {
+      cls: sheet ? sheet.className : '',
+      accent: sheet ? getComputedStyle(sheet).getPropertyValue('--accent').trim() : '',
+      accent2: sheet ? getComputedStyle(sheet).getPropertyValue('--accent-2').trim() : '',
+      metaRows: document.querySelectorAll('table.meta tr').length,
+      words: document.querySelectorAll('.words').length,
+      parties: document.querySelectorAll('.parties').length,
+      ths: document.querySelectorAll('table.lines thead th').length,
+      head: !!document.querySelector('.doc-note'),
+      terms: document.body.textContent.indexOf('TERMES TEST') !== -1,
+      footer: document.body.textContent.indexOf('PIED TEST') !== -1,
+      signature: document.querySelectorAll('.signature').length,
+      wm: (document.querySelector('.wm span') || {}).textContent || '',
+      arHidden: arTitle ? getComputedStyle(arTitle).display === 'none' : false,
+      title: (document.querySelector('.title h1') || {}).textContent || ''
+    };
+  })()`);
+  check('modèle doc : classes de modèle/format/densité/police/langue appliquées',
+    /\bt-modern\b/.test(d.cls) && /\bpaper-A5\b/.test(d.cls) && /\bd-compact\b/.test(d.cls) &&
+    /\bf-serif\b/.test(d.cls) && /\bm-wide\b/.test(d.cls) && /\bb-fr\b/.test(d.cls), d.cls);
+  check('modèle doc : couleur d’accent verte appliquée', d.accent === '#16a34a', d.accent);
+  const sh = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(d.accent2 || '');
+  check('modèle doc : nuances dérivées de l’accent (vert dominant)',
+    !!sh && parseInt(sh[2], 16) > parseInt(sh[1], 16) && parseInt(sh[2], 16) > parseInt(sh[3], 16), d.accent2);
+  check('modèle doc : échéance masquée (2 lignes méta)', d.metaRows === 2, d.metaRows);
+  check('modèle doc : montant en lettres masqué', d.words === 0, d.words);
+  check('modèle doc : bloc client masqué', d.parties === 0, d.parties);
+  check('modèle doc : colonnes Qté/P.U. masquées (3 colonnes)', d.ths === 3, d.ths);
+  check('modèle doc : en-tête, conditions et pied libres', d.head && d.terms && d.footer, { head: d.head, terms: d.terms, footer: d.footer });
+  check('modèle doc : bloc signature affiché', d.signature === 1, d.signature);
+  check('modèle doc : filigrane « BROUILLON »', d.wm === 'BROUILLON', d.wm);
+  check('modèle doc : arabe masqué en mode « français seulement »', d.arHidden === true, d.arHidden);
+
+  if (hasQuote) {
+    const qid = qid0;
+    await win.loadFile(path.join(__dirname, '..', 'src', 'renderer', 'print-quote.html'), { query: { id: qid } });
+    await wait(800);
+    const q = await ev(win, `(function () {
+      const sheet = document.querySelector('.sheet');
+      return {
+        cls: sheet ? sheet.className : '',
+        metaRows: document.querySelectorAll('table.meta tr').length,
+        title: (document.querySelector('.title h1') || {}).textContent || ''
+      };
+    })()`);
+    check('modèle doc : modèle de devis séparé (« élégant ») + validité conservée',
+      /\bt-elegant\b/.test(q.cls) && q.metaRows === 3 && q.title === 'DEVIS', q);
+  }
+}
+
 (async function main() {
   try {
     await app.whenReady();
@@ -2546,6 +2635,7 @@ async function phaseComptabilisation(win) {
     await phaseExportPack(uiWin);
     await phaseQuotes(uiWin);
     await phaseComptabilisation(uiWin);
+    await phaseDocModel(uiWin);
   } catch (e) {
     problems.push('exception: ' + (e && e.stack ? e.stack : e));
   }

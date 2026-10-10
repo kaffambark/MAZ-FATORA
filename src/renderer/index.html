@@ -525,6 +525,143 @@
           </div>
         </div>
 
+        <!-- MODÈLE DES DOCUMENTS (factures & devis) -->
+        <div class="card" id="card-doc">
+          <div class="card-head"><h2 data-i18n="set.docTitle">Modèle des documents (factures &amp; devis)</h2></div>
+          <p class="hint" data-i18n="set.docHint">Personnalisez l’apparence de vos PDF : disposition, couleurs, format, informations affichées et textes. Le modèle par défaut reproduit le rendu actuel.</p>
+
+          <div class="card-head" style="margin-top:6px"><h3 data-i18n="set.docLayout">Modèle et couleurs</h3></div>
+          <div class="form-grid">
+            <label><span data-i18n="set.docTemplate">Modèle de document</span>
+              <select id="doc-template">
+                <option value="classic" data-i18n="set.tplClassic">Classique</option>
+                <option value="modern" data-i18n="set.tplModern">Moderne</option>
+                <option value="minimal" data-i18n="set.tplMinimal">Minimaliste</option>
+                <option value="elegant" data-i18n="set.tplElegant">Élégant à bande</option>
+                <option value="compact" data-i18n="set.tplCompact">Compact</option>
+              </select>
+            </label>
+            <label><span data-i18n="set.docAccent">Couleur d’accent</span>
+              <select id="doc-accent">
+                <option value="auto" data-i18n="set.accAuto">Automatique (facture bleue / devis sarcelle)</option>
+                <option value="blue" data-i18n="set.accBlue">Bleu</option>
+                <option value="green" data-i18n="set.accGreen">Vert</option>
+                <option value="slate" data-i18n="set.accSlate">Ardoise</option>
+                <option value="burgundy" data-i18n="set.accBurgundy">Bordeaux</option>
+                <option value="teal" data-i18n="set.accTeal">Sarcelle</option>
+                <option value="amber" data-i18n="set.accAmber">Ambre</option>
+                <option value="mono" data-i18n="set.accMono">Noir &amp; blanc</option>
+                <option value="custom" data-i18n="set.accCustom">Couleur personnalisée…</option>
+              </select>
+            </label>
+            <label><span data-i18n="set.docAccentCustom">Couleur personnalisée</span>
+              <input type="color" id="doc-accent-color" value="#2563eb">
+            </label>
+            <label><span data-i18n="set.docPaper">Format du papier</span>
+              <select id="doc-paper">
+                <option value="A4">A4 — 210 × 297 mm</option>
+                <option value="A5">A5 — 148 × 210 mm</option>
+              </select>
+            </label>
+            <label><span data-i18n="set.docMargins">Marges</span>
+              <select id="doc-margins">
+                <option value="narrow" data-i18n="set.mgNarrow">Étroites</option>
+                <option value="normal" data-i18n="set.mgNormal">Normales</option>
+                <option value="wide" data-i18n="set.mgWide">Larges</option>
+              </select>
+            </label>
+            <label><span data-i18n="set.docDensity">Densité</span>
+              <select id="doc-density">
+                <option value="compact" data-i18n="set.denCompact">Compacte</option>
+                <option value="normal" data-i18n="set.denNormal">Normale</option>
+                <option value="airy" data-i18n="set.denAiry">Aérée</option>
+              </select>
+            </label>
+            <label><span data-i18n="set.docFont">Police</span>
+              <select id="doc-font">
+                <option value="sans" data-i18n="set.fontSans">Sans empattement (moderne)</option>
+                <option value="serif" data-i18n="set.fontSerif">À empattement (classique)</option>
+              </select>
+            </label>
+            <label><span data-i18n="set.docBilingual">Langues affichées</span>
+              <select id="doc-bilingual">
+                <option value="both" data-i18n="set.biBoth">Bilingue (français + arabe)</option>
+                <option value="fr" data-i18n="set.biFr">Français seulement</option>
+                <option value="ar" data-i18n="set.biAr">Arabe seulement</option>
+              </select>
+            </label>
+            <label><span data-i18n="set.docWatermark">Filigrane</span>
+              <select id="doc-watermark">
+                <option value="none" data-i18n="set.wmNone">Aucun</option>
+                <option value="paid" data-i18n="set.wmPaid">« PAYÉE »</option>
+                <option value="draft" data-i18n="set.wmDraft">« BROUILLON »</option>
+                <option value="quote" data-i18n="set.wmQuote">« DEVIS »</option>
+              </select>
+            </label>
+            <label><span data-i18n="set.docInvoiceTpl">Modèle des factures</span>
+              <select id="doc-invoice-template">
+                <option value="" data-i18n="set.tplSame">Comme le modèle principal</option>
+                <option value="classic" data-i18n="set.tplClassic">Classique</option>
+                <option value="modern" data-i18n="set.tplModern">Moderne</option>
+                <option value="minimal" data-i18n="set.tplMinimal">Minimaliste</option>
+                <option value="elegant" data-i18n="set.tplElegant">Élégant à bande</option>
+                <option value="compact" data-i18n="set.tplCompact">Compact</option>
+              </select>
+            </label>
+            <label><span data-i18n="set.docQuoteTpl">Modèle des devis</span>
+              <select id="doc-quote-template">
+                <option value="" data-i18n="set.tplSame">Comme le modèle principal</option>
+                <option value="classic" data-i18n="set.tplClassic">Classique</option>
+                <option value="modern" data-i18n="set.tplModern">Moderne</option>
+                <option value="minimal" data-i18n="set.tplMinimal">Minimaliste</option>
+                <option value="elegant" data-i18n="set.tplElegant">Élégant à bande</option>
+                <option value="compact" data-i18n="set.tplCompact">Compact</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="card-head" style="margin-top:14px"><h3 data-i18n="set.docBlocks">Informations affichées</h3></div>
+          <div class="form-grid">
+            <label class="check"><input type="checkbox" id="doc-logo"><span data-i18n="set.blkLogo">Logo de la société</span></label>
+            <label class="check"><input type="checkbox" id="doc-namear"><span data-i18n="set.blkNameAr">Nom de la société en arabe</span></label>
+            <label class="check"><input type="checkbox" id="doc-companyids"><span data-i18n="set.blkCompanyIds">Identifiants de la société (ICE, IF, RC, Patente, CNSS, TVA)</span></label>
+            <label class="check"><input type="checkbox" id="doc-clientids"><span data-i18n="set.blkClientIds">Bloc client</span></label>
+            <label class="check"><input type="checkbox" id="doc-tvadetail"><span data-i18n="set.blkTvaDetail">TVA détaillée par taux</span></label>
+            <label class="check"><input type="checkbox" id="doc-regime"><span data-i18n="set.blkRegime">Régime de TVA</span></label>
+            <label class="check"><input type="checkbox" id="doc-rib"><span data-i18n="set.blkRib">RIB / mode de règlement</span></label>
+            <label class="check"><input type="checkbox" id="doc-notes"><span data-i18n="set.blkNotes">Notes</span></label>
+            <label class="check"><input type="checkbox" id="doc-legal"><span data-i18n="set.blkLegal">Mentions légales</span></label>
+            <label class="check"><input type="checkbox" id="doc-signature"><span data-i18n="set.blkSignature">Bloc signature / cachet</span></label>
+            <label class="check"><input type="checkbox" id="doc-duedate"><span data-i18n="set.blkDueDate">Échéance (facture)</span></label>
+            <label class="check"><input type="checkbox" id="doc-validity"><span data-i18n="set.blkValidity">Validité (devis)</span></label>
+            <label class="check"><input type="checkbox" id="doc-colsqty"><span data-i18n="set.blkColsQty">Colonne « Qté »</span></label>
+            <label class="check"><input type="checkbox" id="doc-colspu"><span data-i18n="set.blkColsPu">Colonne « P.U. HT »</span></label>
+            <label class="check"><input type="checkbox" id="doc-colstva"><span data-i18n="set.blkColsTva">Colonne « TVA »</span></label>
+            <label class="check"><input type="checkbox" id="doc-colstotal"><span data-i18n="set.blkColsTotal">Colonne « Total HT »</span></label>
+            <label><span data-i18n="set.docWords">Montant en toutes lettres</span>
+              <select id="doc-words">
+                <option value="both" data-i18n="set.wordsBoth">Français + arabe</option>
+                <option value="fr" data-i18n="set.wordsFr">Français seulement</option>
+                <option value="ar" data-i18n="set.wordsAr">Arabe seulement</option>
+                <option value="none" data-i18n="set.wordsNone">Aucun</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="card-head" style="margin-top:14px"><h3 data-i18n="set.docTexts">Textes personnalisés</h3></div>
+          <div class="form-grid">
+            <label class="wide"><span data-i18n="set.docHeader">En-tête libre (haut du document)</span><textarea id="doc-header" rows="2" data-i18n-ph="set.docHeaderPh"></textarea></label>
+            <label class="wide"><span data-i18n="set.docTerms">Conditions de règlement (remplace la mention par défaut)</span><textarea id="doc-terms" rows="3" data-i18n-ph="set.docTermsPh"></textarea></label>
+            <label class="wide"><span data-i18n="set.docFooter">Pied de page libre (remplace la mention par défaut)</span><textarea id="doc-footer" rows="2" data-i18n-ph="set.docFooterPh"></textarea></label>
+          </div>
+          <p class="hint" data-i18n="set.docLegalWarn">Attention : masquer les identifiants légaux (ICE, IF, RC, CNSS, TVA) ou les mentions réglementaires peut rendre la facture non conforme à la réglementation marocaine.</p>
+          <div class="row" style="margin-top:14px">
+            <button class="btn" id="btn-preview-doc"><span data-i18n="set.docPreview">Aperçu du dernier document</span></button>
+            <button class="btn" id="btn-reset-doc"><span data-i18n="set.docReset">Réinitialiser le modèle</span></button>
+            <span class="muted" id="doc-saved"></span>
+          </div>
+        </div>
+
         <!-- DÉSIGNATIONS DES FACTURES -->
         <div class="card" id="card-designations">
           <div class="card-head"><h2 data-i18n="set.desigTitle">Désignations des factures</h2></div>
@@ -644,6 +781,7 @@
   <script src="i18n.js"></script>
   <script src="csv.js"></script>
   <script src="words.js"></script>
+  <script src="doc-config.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
