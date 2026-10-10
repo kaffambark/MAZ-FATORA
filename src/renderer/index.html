@@ -73,6 +73,9 @@
         <button class="nav-item" data-view="quotes">
           <svg class="ic"><use href="#i-quotes"/></svg><span class="nav-label" data-i18n="nav.quotes">Devis</span><span class="badge" id="nav-quotes-count">0</span>
         </button>
+        <button class="nav-item" data-view="credits">
+          <svg class="ic"><use href="#i-invoices"/></svg><span class="nav-label" data-i18n="nav.credits">Avoirs</span><span class="badge" id="nav-credits-count">0</span>
+        </button>
         <button class="nav-item" data-view="payments">
           <svg class="ic"><use href="#i-payments"/></svg><span class="nav-label" data-i18n="nav.payments">Paiements</span>
         </button>
@@ -392,6 +395,30 @@
         </div>
       </section>
 
+      <!-- AVOIRS / NOTES DE CRÉDIT -->
+      <section id="view-credits" class="view">
+        <header class="view-header">
+          <h1><span data-i18n="cr.title">Avoirs</span> <span class="badge big" id="credits-count">0</span></h1>
+          <div class="actions">
+            <input type="search" id="credit-search" data-i18n-ph="cr.search" placeholder="Rechercher un avoir…">
+            <select id="credit-filter">
+              <option value="all" data-i18n="cr.filterAll">Tous les statuts</option>
+              <option value="draft" data-i18n="cr.filterDraft">Brouillons</option>
+              <option value="validated" data-i18n="cr.filterValidated">Validés</option>
+            </select>
+            <button class="btn primary" id="btn-new-credit">
+              <svg class="ic"><use href="#i-plus"/></svg><span data-i18n="cr.new">Nouvel avoir</span>
+            </button>
+          </div>
+        </header>
+        <div class="card">
+          <p class="hint" data-i18n-html="cr.hint">Un avoir (note de crédit) est numéroté <strong>AV‑AAAA‑NNNN</strong> et vient en déduction d'une facture : le reste dû et la TVA collectée sont diminués. Il est toujours rattaché à une facture validée.</p>
+          <div class="table-wrap">
+            <table id="credit-table"></table>
+          </div>
+        </div>
+      </section>
+
       <!-- PAIEMENTS -->
       <section id="view-payments" class="view">
         <header class="view-header">
@@ -528,6 +555,7 @@
             <label><span data-i18n="set.delay">Délai de règlement (jours)</span><input type="number" id="set-delay" min="0" step="1"></label>
             <label><span data-i18n="set.prefix">Préfixe de numérotation</span><input type="text" id="set-prefix" placeholder="FA"></label>
             <label><span data-i18n="set.quotePrefix">Préfixe des devis</span><input type="text" id="set-quote-prefix" placeholder="DV"></label>
+            <label><span data-i18n="set.creditPrefix">Préfixe des avoirs</span><input type="text" id="set-credit-prefix" placeholder="AV"></label>
             <label><span data-i18n="set.quoteValidity">Validité des devis (jours)</span><input type="number" id="set-quote-validity" min="1" step="1"></label>
             <label><span data-i18n="set.startNum">Début de numérotation (n° de la 1re facture)</span>
               <input type="number" id="set-startnum" min="1" step="1" value="1"></label>

@@ -33,6 +33,7 @@
   };
   const AUTO_INVOICE = '#2563eb';
   const AUTO_QUOTE = '#0891b2';
+  const AUTO_CREDIT = '#b91c1c';
 
   const ACCENTS = ['auto', 'custom'].concat(Object.keys(PALETTES));
   const PAPERS = ['A4', 'A5'];
@@ -79,7 +80,8 @@
     texts: { header: '', terms: '', footer: '' },
     /* Modèles distincts par type de document ('' = utiliser `template`) */
     invoiceTemplate: '',
-    quoteTemplate: ''
+    quoteTemplate: '',
+    creditTemplate: ''
   };
 
   function pick(v, list, def) {
@@ -104,7 +106,8 @@
       blocks: {},
       texts: {},
       invoiceTemplate: pick(d.invoiceTemplate, TEMPLATES, ''),
-      quoteTemplate: pick(d.quoteTemplate, TEMPLATES, '')
+      quoteTemplate: pick(d.quoteTemplate, TEMPLATES, ''),
+      creditTemplate: pick(d.creditTemplate, TEMPLATES, '')
     };
     const b = (d.blocks && typeof d.blocks === 'object') ? d.blocks : {};
     for (const k of Object.keys(DEFAULT.blocks)) {
@@ -127,16 +130,16 @@
   }
 
   /* Couleur d'accent effective. `auto` = couleur historique selon le type :
-     bleu pour la facture, sarcelle (cyan) pour le devis. */
+     bleu pour la facture, sarcelle (cyan) pour le devis, rouge pour l'avoir. */
   function accentHex(doc, kind) {
     if (doc.accent === 'custom') return doc.accentColor;
-    if (doc.accent === 'auto') return kind === 'quote' ? AUTO_QUOTE : AUTO_INVOICE;
+    if (doc.accent === 'auto') return kind === 'quote' ? AUTO_QUOTE : (kind === 'credit' ? AUTO_CREDIT : AUTO_INVOICE);
     return PALETTES[doc.accent] || AUTO_INVOICE;
   }
 
-  /* Modèle effectif pour un type de document donné ('invoice' | 'quote'). */
+  /* Modèle effectif pour un type de document donné ('invoice' | 'quote' | 'credit'). */
   function templateFor(doc, kind) {
-    const override = kind === 'quote' ? doc.quoteTemplate : doc.invoiceTemplate;
+    const override = kind === 'quote' ? doc.quoteTemplate : (kind === 'credit' ? doc.creditTemplate : doc.invoiceTemplate);
     return override || doc.template || DEFAULT.template;
   }
 

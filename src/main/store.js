@@ -3,19 +3,23 @@
 const fs = require('fs');
 const path = require('path');
 
-const COLLECTIONS = ['settings', 'clients', 'invoices', 'transactions', 'rules', 'quotes', 'meta'];
+const COLLECTIONS = ['settings', 'clients', 'invoices', 'transactions', 'rules', 'quotes', 'creditNotes', 'meta'];
 
 /* Version du schéma de données (P0 fiabilisation).
    - 0 = bases antérieures à la v1.13 (aucun marqueur écrit).
    - 1 = v1.13/v1.14 : le marqueur est écrit dans <dir>/schema.json.
    - 2 = v1.15 : nouvelle collection « devis » (quotes, numérotation DV distincte).
+   - 3 = v1.24 : nouvelle collection « avoirs » (creditNotes, numérotation AV
+     distincte) et séquence meta.creditSeq.
    Une base qui n'a pas de marqueur est considérée en version 0 puis migrée
    sans transformation tant qu'aucune évolution de structure n'est requise. */
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 /* Migrations : MIGRATIONS[v] = transformation pour passer de la version v à v+1.
    v1 → v2 (devis) : matérialise la collection quotes (nouvelle) et complète
-   meta avec la séquence de numérotation des devis (quoteSeq). */
+   meta avec la séquence de numérotation des devis (quoteSeq).
+   v2 → v3 (avoir) : matérialise la collection creditNotes (nouvelle) et complète
+   meta avec la séquence de numérotation des avoirs (creditSeq). */
 const MIGRATIONS = {
   1: (api) => {
     try {
@@ -24,6 +28,15 @@ const MIGRATIONS = {
       api.save('meta', api.read('meta'));
       /* quotes : nouvelle collection, matérialisée (vide) pour les anciennes bases. */
       api.save('quotes', api.read('quotes') || []);
+    } catch (e) { /* non bloquant : les défauts couvrent un échec de migration */ }
+  },
+  2: (api) => {
+    try {
+      /* meta : relu avec les défauts fusionnés (creditSeq devient 0) puis réécrit
+         pour matérialiser le champ sur le disque. */
+      api.save('meta', api.read('meta'));
+      /* creditNotes : nouvelle collection, matérialisée (vide). */
+      api.save('creditNotes', api.read('creditNotes') || []);
     } catch (e) { /* non bloquant : les défauts couvrent un échec de migration */ }
   }
 };
@@ -58,6 +71,7 @@ const DEFAULTS = {
     invoicePrefix: 'FA',
     quotePrefix: 'DV',
     quoteValidityDays: 30,
+    creditPrefix: 'AV',
     autoGenerateOnImport: true,
     lockOnQuit: false
   },
@@ -66,7 +80,8 @@ const DEFAULTS = {
   transactions: [],
   rules: [],
   quotes: [],
-  meta: { invoiceSeq: 0, quoteSeq: 0 }
+  creditNotes: [],
+  meta: { invoiceSeq: 0, quoteSeq: 0, creditSeq: 0 }
 };
 
 function clone(v) {

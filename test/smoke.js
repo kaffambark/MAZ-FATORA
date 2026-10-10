@@ -43,12 +43,14 @@ const storeStub = {
     paymentDelay: 30,
     invoicePrefix: 'FA',
     quotePrefix: 'DV',
+    creditPrefix: 'AV',
     quoteValidityDays: 30,
     onboarded: true
   },
   clients: [{ id: 'c1', name: 'Dupont SARL', email: '', address: '', tvaNumber: '', phone: '' }],
   invoices: [],
   quotes: [],
+  creditNotes: [],
   transactions: [
     { id: 't1', date: '2026-10-01', label: 'VIREMENT DU CLIENT DUPONT', amount: 1200.5, status: 'new', linkedInvoiceId: null },
     { id: 't2', date: '2026-10-03', label: 'CB LECLERC MARKET', amount: -87.45, status: 'new', linkedInvoiceId: null },
@@ -56,7 +58,7 @@ const storeStub = {
     { id: 't4', date: '2026-11-02', label: 'VIREMENT HORS PERIODE', amount: 500, status: 'new', linkedInvoiceId: null }
   ],
   rules: [],
-  meta: { invoiceSeq: 0, quoteSeq: 0 }
+  meta: { invoiceSeq: 0, quoteSeq: 0, creditSeq: 0 }
 };
 
 /* ---- Sécurité (stubs alignés sur main.js, via le vrai module security.js) ----
@@ -212,7 +214,7 @@ ipcMain.handle('export:close-period', async (event, period) => {
 });
 
 /* Version de l'application (lue dans package.json par le vrai main.js) */
-ipcMain.handle('app:version', () => '1.23');
+ipcMain.handle('app:version', () => '1.24');
 
 function check(name, cond, detail) {
   if (cond) console.log('  ok   ' + name);
@@ -270,13 +272,13 @@ async function phaseUi() {
   })()`);
 
   check('API preload présente', base.hasApi);
-  check('10 vues rendues (dont Paiements et Devis)', base.views === 10, base.views);
+  check('11 vues rendues (dont Avoirs, Paiements et Devis)', base.views === 11, base.views);
   check('nom de l\'application = MAZ-FATORA', base.title === 'MAZ-FATORA', base.title);
   check('logo de marque chargé (Logo.png)', base.logo && base.logo.ok, base.logo);
   check('logo posé sur fond blanc (lisibilité sur la sidebar bleue)',
     base.brandBg === 'rgb(255, 255, 255)', base.brandBg);
   check('favicon Icon.png déclaré', /Icon\.png/.test(base.favicon || ''), base.favicon);
-  check('version affichée dans la sidebar (v1.23)', base.version === 'v1.23', base.version);
+  check('version affichée dans la sidebar (v1.24)', base.version === 'v1.24', base.version);
   check('tableau de bord rempli', base.dashRendered);
   check('parseur CSV', !base.csvError && base.csv && base.csv.length === 3 &&
     base.csv[0].amount === 1200.5 && base.csv[1].amount === -25.5 && base.csv[2].amount === 34.99, base.csv || base.csvError);
@@ -629,8 +631,8 @@ async function phaseExtras(win) {
       dbPath: (document.querySelector('#set-db-path') || {}).value || ''
     };
   })()`);
-  check('10 vues et 10 entrées de menu (nouvelle vue Paiements)',
-    entry.views === 10 && entry.navs === 10, entry);
+  check('11 vues et 11 entrées de menu (nouvelles vues Avoirs et Paiements)',
+    entry.views === 11 && entry.navs === 11, entry);
   check('accès « Nouvelle facture » (tableau de bord + factures validées)',
     entry.dashBtn && entry.invBtn, entry);
   check('vue Paiements : recherche et filtre présents', entry.payFilters, entry);
@@ -976,8 +978,8 @@ async function phaseExtras(win) {
       payments: val[0] ? (val[0].payments || []).length : -1
     };
   })()`);
-  check('état final propre (10 vues, modale fermée, base affichée, 1 règlement)',
-    final.views === 10 && final.modalHidden && final.dbPath === DATA_DIR && final.payments === 1, final);
+  check('état final propre (11 vues, modale fermée, base affichée, 1 règlement)',
+    final.views === 11 && final.modalHidden && final.dbPath === DATA_DIR && final.payments === 1, final);
 }
 
 async function phasePdf(uiWin) {
@@ -1831,7 +1833,7 @@ async function phaseSecurite(uiWin) {
   })()`);
   check('3 : sans protection, l\'application s\'ouvre normalement (pas d\'écran de verrouillage)',
     s0.lockHidden === true && s0.lockBtnHidden === true && s0.hasSecCard === true &&
-    s0.enableHidden === false && s0.views === 10 && s0.dash.length > 0, s0);
+    s0.enableHidden === false && s0.views === 11 && s0.dash.length > 0, s0);
 
   /* --- b) activation : Paramètres → Sécurité → « Activer la protection » --- */
   await ev(win, `showView('settings'); true`);
@@ -2784,7 +2786,7 @@ async function phaseHelp(win) {
     };
   })()`);
   check('aide : contenu et moteur chargés',
-    loaded.hasContent && loaded.hasUi && loaded.articles >= 40 && loaded.cats >= 5 && loaded.screens === 10, loaded);
+    loaded.hasContent && loaded.hasUi && loaded.articles >= 41 && loaded.cats >= 5 && loaded.screens === 11, loaded);
 
   const triggers = await ev(win, `(function () {
     return {
@@ -2794,7 +2796,7 @@ async function phaseHelp(win) {
     };
   })()`);
   check('aide : bouton latéral présent', triggers.side === true, triggers);
-  check('aide : bouton « ? » sur chaque écran', triggers.screenBtns === 10, triggers);
+  check('aide : bouton « ? » sur chaque écran', triggers.screenBtns === 11, triggers);
 
   await ev(win, `(function () {
     showView('invoices');
@@ -3015,7 +3017,7 @@ async function phaseGuide(win) {
   })()`);
   check('guide : couverture, sommaire, articles et aide-mémoire rendus (FR)',
     fr.dir === 'ltr' && fr.title === 'Guide d’utilisation' && fr.toc && fr.memo && fr.articles >= 40, fr);
-  check('guide : version affichée sur la couverture', /v1\.23/.test(fr.coverText), fr.coverText.slice(0, 100));
+  check('guide : version affichée sur la couverture', /v1\.24/.test(fr.coverText), fr.coverText.slice(0, 100));
 
   const pdf = await win.webContents.printToPDF({ printBackground: true, pageSize: 'A4' });
   check('guide : export PDF non vide (%PDF)',
@@ -3040,6 +3042,132 @@ async function phaseGuide(win) {
     wires.open && wires.pdf && wires.api, wires);
 }
 
+/* ---- PHASE : avoirs / notes de crédit (v1.24) ---- *
+   - numérotation AV-AAAA-NNNN, rattachement obligatoire à une facture validée,
+   - impact sur le reste dû (les avoirs validés viennent en déduction),
+   - bornage du montant au reste facturable, rendu bilingue du document,
+   - suppression du dernier avoir + rembobinage du compteur. */
+async function phaseCredits(uiWin) {
+  const win = uiWin;
+  await win.loadFile(path.join(__dirname, '..', 'src', 'renderer', 'index.html'));
+  await wait(900);
+
+  /* Base propre : une facture validée de 1 200,00 TTC (1 000 HT + 200 TVA) */
+  const inv = await ev(win, `(async function () {
+    state.invoices = []; state.creditNotes = [];
+    state.meta.invoiceSeq = 0; state.meta.creditSeq = 0;
+    openInvoiceEditor(null);
+    const set = (sel, v) => { const el = document.querySelector(sel); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    const cs = document.querySelector('#ie-client'); cs.value = state.clients[0].id; cs.dispatchEvent(new Event('change', { bubbles: true }));
+    set('#ie-lines input[data-f="desc"]', 'Prestation A');
+    set('#ie-lines input[data-f="qty"]', '1');
+    set('#ie-lines input[data-f="price"]', '1000');
+    document.querySelector('#ie-validate').click();
+    await new Promise(function (r) { setTimeout(r, 300); });
+    const i = state.invoices[0];
+    return { number: i && i.number, ttc: i && totals(i).ttc, rest: i && restDue(i) };
+  })()`);
+  check('avoir : facture de base validée (1 200,00 TTC, reste dû 1 200,00)',
+    /^FA-\d{4}-0001$/.test(inv.number) && inv.ttc === 1200 && inv.rest === 1200, inv);
+
+  /* Création d'un avoir partiel de 600,00 TTC rattaché à la facture */
+  const cr = await ev(win, `(async function () {
+    const i = state.invoices[0];
+    openCreditEditor(null, i.id);
+    const set = (sel, v) => { const el = document.querySelector(sel); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    set('#cre-reason', 'Retour partiel de marchandise');
+    set('#cre-lines input[data-f="desc"]', 'Retour partiel');
+    set('#cre-lines input[data-f="qty"]', '1');
+    set('#cre-lines input[data-f="price"]', '500');
+    document.querySelector('#cre-validate').click();
+    await new Promise(function (r) { setTimeout(r, 350); });
+    const c = state.creditNotes[0];
+    const i2 = state.invoices[0];
+    return {
+      n: state.creditNotes.length,
+      number: c && c.number,
+      status: c && c.status,
+      ttc: c && totals(c).ttc,
+      reason: c && c.reason,
+      refNumber: c && c.refNumber,
+      rest: i2 && restDue(i2),
+      credited: i2 && creditedTotal(i2),
+      modalHidden: document.querySelector('#modal-root').hidden
+    };
+  })()`);
+  check('avoir créé : AV-AAAA-0001 validé, 600,00 TTC rattaché à FA-0001, reste dû réduit à 600,00',
+    cr.n === 1 && /^AV-\d{4}-0001$/.test(cr.number) && cr.status === 'validated' &&
+    cr.ttc === 600 && !!cr.reason && /^FA-\d{4}-0001$/.test(cr.refNumber) &&
+    cr.rest === 600 && cr.credited === 600 && cr.modalHidden, cr);
+
+  const persisted = await ev(win, `window.factapi.storeGet()`);
+  check('avoir persisté (collection creditNotes + meta.creditSeq)',
+    Array.isArray(persisted.creditNotes) && persisted.creditNotes.length === 1 &&
+    persisted.meta.creditSeq === 1 &&
+    /^AV-\d{4}-0001$/.test(persisted.creditNotes[0].number),
+    { n: persisted.creditNotes.length, seq: persisted.meta.creditSeq });
+
+  /* Bornage : un second avoir ne peut dépasser le reste facturable (600,00) */
+  const over = await ev(win, `(async function () {
+    const i = state.invoices[0];
+    openCreditEditor(null, i.id);
+    const set = (sel, v) => { const el = document.querySelector(sel); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
+    set('#cre-reason', 'Trop élevé');
+    set('#cre-lines input[data-f="desc"]', 'Trop élevé');
+    set('#cre-lines input[data-f="price"]', '900');
+    document.querySelector('#cre-validate').click();
+    await new Promise(function (r) { setTimeout(r, 200); });
+    const n = state.creditNotes.length;
+    closeModal();
+    return { n: n };
+  })()`);
+  check('avoir borné : un avoir dépassant le reste facturable est refusé',
+    over.n === 1, over);
+
+  /* Aperçu d'impression : AVOIR bilingue, facture d'origine, motif, sans PAYÉE.
+     On repart des réglages de document par défaut (les phases précédentes ont pu
+     masquer le montant en lettres). */
+  delete storeStub.settings.doc;
+  const cid = await ev(win, `state.creditNotes[0].id`);
+  await win.loadFile(path.join(__dirname, '..', 'src', 'renderer', 'print-credit.html'), { query: { id: cid } });
+  await wait(800);
+  const pc = await ev(win, `(function () {
+    const body = document.body.textContent;
+    return {
+      h1: (document.querySelector('.title h1') || {}).textContent || '',
+      ar: (document.querySelector('.title-ar') || {}).textContent || '',
+      ref: /Facture d'origine/.test(body),
+      refNum: /FA-\\d{4}-0001/.test(body),
+      reason: /Retour partiel de marchandise/.test(body),
+      badge: !!document.querySelector('.badge-paid'),
+      words: /Arrêté le présent avoir/.test(body),
+      ttc: /600,00[\\s\\u202f\\u00a0]*MAD/.test(body),
+      toolbar: Array.from(document.querySelectorAll('.toolbar button')).map(function (b) { return b.textContent; }).join(' | ')
+    };
+  })()`);
+  check('aperçu avoir : AVOIR / إشعار دائن, facture d\'origine + motif, montant en lettres, sans PAYÉE',
+    pc.h1 === 'AVOIR' && pc.ar.indexOf('إشعار دائن') !== -1 && pc.ref && pc.refNum &&
+    pc.reason && !pc.badge && pc.words && pc.ttc, pc);
+  check('aperçu avoir : barre d\'outils en français', /Fermer/.test(pc.toolbar), pc.toolbar);
+
+  /* Suppression : l'avoir est le dernier de la série → suppression autorisée,
+     le compteur est rembobiné. */
+  await win.loadFile(path.join(__dirname, '..', 'src', 'renderer', 'index.html'));
+  await wait(900);
+  const del = await ev(win, `(async function () {
+    showView('credits');
+    const btn = document.querySelector('#credit-table [data-action="delete-credit"]');
+    if (btn) btn.click();
+    await new Promise(function (r) { setTimeout(r, 120); });
+    const ok = document.querySelector('#cf-ok');
+    if (ok) ok.click();
+    await new Promise(function (r) { setTimeout(r, 350); });
+    return { n: state.creditNotes.length, seq: state.meta.creditSeq };
+  })()`);
+  check('avoir supprimé (dernier de la série) et compteur rembobiné',
+    del.n === 0 && del.seq === 0, del);
+}
+
 (async function main() {
   try {
     await app.whenReady();
@@ -3061,6 +3189,7 @@ async function phaseGuide(win) {
     await phaseOnboarding(uiWin);
     await phaseGuide(uiWin);
     await phaseHelp(uiWin);
+    await phaseCredits(uiWin);
   } catch (e) {
     problems.push('exception: ' + (e && e.stack ? e.stack : e));
   }

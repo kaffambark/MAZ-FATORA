@@ -25,7 +25,7 @@
 
 (function (root) {
   /* Écrans de l'application (ancrage de l'aide contextuelle). */
-  const SCREENS = ['dashboard', 'import', 'transactions', 'drafts', 'invoices', 'quotes', 'payments', 'clients', 'rules', 'settings'];
+  const SCREENS = ['dashboard', 'import', 'transactions', 'drafts', 'invoices', 'quotes', 'credits', 'payments', 'clients', 'rules', 'settings'];
 
   const CATEGORIES = [
     { id: 'start', title: { fr: 'Démarrage', ar: 'البدء' }, icon: 'i-dash' },
@@ -356,6 +356,44 @@
       related: ['task.new-quote', 'task.quote-to-invoice', 'screen.invoices']
     },
 
+    'screen.credits': {
+      category: 'screen', screen: 'credits', priority: 1,
+      title: { fr: 'Les avoirs (notes de crédit)', ar: 'الإشعارات الدائنة' },
+      goal: {
+        fr: 'Constater un retour, une remise ou une correction sur une facture validée.',
+        ar: 'تسجيل إرجاع أو خصم أو تصحيح على فاتورة معتمدة.'
+      },
+      prereq: {
+        fr: ['Avoir au moins une facture validée.'],
+        ar: ['توفّر فاتورة معتمدة واحدة على الأقل.']
+      },
+      steps: {
+        fr: [
+          'Cliquez sur « Nouvel avoir » (ou « Créer un avoir » depuis une facture).',
+          'Choisissez la facture d’origine et indiquez le motif.',
+          'Ajustez les lignes (le taux de TVA suit la facture).',
+          'Validez : un numéro AV‑AAAA‑NNNN est attribué.'
+        ],
+        ar: [
+          'انقر «إشعار دائن جديد» (أو «إنشاء إشعار دائن» من فاتورة).',
+          'اختر الفاتورة الأصلية وحدّد السبب.',
+          'عدّل الأسطر (يتبع معدل TVA الفاتورة).',
+          'اعتمد: يُمنح الرقم AV‑AAAA‑NNNN.'
+        ]
+      },
+      tips: {
+        fr: [
+          'Un avoir validé réduit le reste dû de la facture et la TVA collectée.',
+          'Le montant est borné au reste facturable ; un avoir reste rattaché à sa facture.'
+        ],
+        ar: [
+          'الإشعار الدائن المعتمد يخفض المتبقي على الفاتورة وTVA المحصّلة.',
+          'المبلغ محدود بالمتبقي القابل للفوترة، ويبقى الإشعار مرتبطًا بفاتورته.'
+        ]
+      },
+      related: ['screen.invoices', 'task.invoice-to-credit']
+    },
+
     'screen.payments': {
       category: 'screen', screen: 'payments', priority: 1,
       title: { fr: 'Les paiements', ar: 'المدفوعات' },
@@ -569,6 +607,34 @@
         ar: ['يُستنسخ محتوى العرض (الأسطر والعميل) تلقائيًا.']
       },
       related: ['screen.quotes', 'task.new-quote', 'screen.invoices']
+    },
+
+    'task.invoice-to-credit': {
+      category: 'tasks', screen: 'invoices', priority: 1,
+      title: { fr: 'Créer un avoir sur une facture', ar: 'إنشاء إشعار دائن على فاتورة' },
+      goal: {
+        fr: 'Annuler ou réduire une facture validée (retour, remise, correction).',
+        ar: 'إلغاء فاتورة معتمدة أو تخفيضها (إرجاع، خصم، تصحيح).'
+      },
+      steps: {
+        fr: [
+          'Ouvrez « Factures validées » et repérez la facture concernée.',
+          'Cliquez sur « Créer un avoir ».',
+          'Indiquez le motif et ajustez les lignes à créditer.',
+          'Validez : l’avoir AV‑AAAA‑NNNN réduit le reste dû et la TVA.'
+        ],
+        ar: [
+          'افتح «الفواتير المعتمدة» وحدّد الفاتورة المعنية.',
+          'انقر «إنشاء إشعار دائن».',
+          'أدخل السبب وعدّل الأسطر المُقيَّدة.',
+          'أكّد: الإشعار AV‑AAAA‑NNNN يخفض المتبقي وTVA.'
+        ]
+      },
+      tips: {
+        fr: ['Un avoir est toujours rattaché à une facture validée ; il apparaît dans la vue « Avoirs ».'],
+        ar: ['الإشعار الدائن مرتبط دائمًا بفاتورة معتمدة، ويظهر في شاشة «الإشعارات الدائنة».']
+      },
+      related: ['screen.credits', 'screen.invoices']
     },
 
     'task.payment': {

@@ -279,6 +279,11 @@ async function buildInvoiceWindow(id, visible) {
   return buildDocWindow('print-invoice.html', { id }, visible);
 }
 
+/* Fenêtre d'un avoir / note de crédit (rendu print-credit.html). */
+async function buildCreditWindow(id, visible) {
+  return buildDocWindow('print-credit.html', { id }, visible);
+}
+
 /* Fenêtre du guide d'utilisation (aperçu / PDF), bilingue. */
 async function buildGuideWindow(lang, visible) {
   return buildDocWindow('print-guide.html', { lang: lang === 'ar' ? 'ar' : 'fr' }, visible);
@@ -290,6 +295,7 @@ async function buildGuideWindow(lang, visible) {
    paramètres de l'URL ({ id } ou { lang }). */
 async function buildDocWindow(htmlFile, query, visible) {
   const title = htmlFile === 'print-quote.html' ? I18N.tr('main.winQuote')
+    : htmlFile === 'print-credit.html' ? I18N.tr('main.winCredit')
     : (htmlFile === 'print-guide.html' ? I18N.tr('main.winGuide') : I18N.tr('main.winInvoice'));
   const win = new BrowserWindow({
     show: visible,
@@ -703,6 +709,42 @@ function registerIpc() {
     try {
       const win = await buildDocWindow('print-quote.html', { id: quoteId }, true);
       win.setTitle(I18N.tr('main.winQuote'));
+      win.focus();
+      return true;
+    } catch (e) {
+      const parent = ipcWindow(event);
+      dialog.showErrorBox(I18N.tr('main.previewFail'), String(e && e.message ? e.message : e));
+      return false;
+    }
+  }));
+
+  /* --- Avoirs / notes de crédit : aperçu et sauvegarde en PDF (print-credit.html) --- */
+  ipcMain.handle('credit:export-pdf', withBusy(gated(async (event, creditId) => {
+    const parent = ipcWindow(event);
+    const data = store.loadAll();
+    const credit = (data.creditNotes || []).find((c) => c.id === creditId);
+    let win = null;
+    try {
+      win = await buildCreditWindow(creditId, false);
+      const pdf = await printToPdf(win);
+      const suggested = (credit && (credit.number || 'avoir')) + '.pdf';
+      const save = await dialog.showSaveDialog(parent, {
+        title: I18N.tr('main.savePdf'),
+        defaultPath: suggested,
+        filters: [{ name: 'PDF', extensions: ['pdf'] }]
+      });
+      if (save.canceled || !save.filePath) return { canceled: true };
+      fs.writeFileSync(save.filePath, pdf);
+      return { canceled: false, path: save.filePath };
+    } finally {
+      if (win && !win.isDestroyed()) win.destroy();
+    }
+  })));
+
+  ipcMain.handle('credit:preview', gated(async (event, creditId) => {
+    try {
+      const win = await buildCreditWindow(creditId, true);
+      win.setTitle(I18N.tr('main.winCredit'));
       win.focus();
       return true;
     } catch (e) {

@@ -9,6 +9,7 @@ const state = {
   transactions: [],
   rules: [],
   quotes: [],
+  creditNotes: [],
   meta: {}
 };
 
@@ -132,6 +133,7 @@ function tvaOptionsHTML(value) {
 function clientById(id) { return state.clients.find((c) => c.id === id) || null; }
 function invoiceById(id) { return state.invoices.find((i) => i.id === id) || null; }
 function quoteById(id) { return state.quotes.find((q) => q.id === id) || null; }
+function creditById(id) { return state.creditNotes.find((c) => c.id === id) || null; }
 function txById(id) { return state.transactions.find((t) => t.id === id) || null; }
 
 function clientNameOf(inv) {
@@ -176,8 +178,17 @@ function paidAmount(inv) {
   return inv.paid ? round2(totals(inv).ttc) : 0;
 }
 
+/* Avoirs validés rattachés à une facture (note de crédit) : ils réduisent le
+   reste dû au même titre qu'un encaissement. Source unique pour les vues. */
+function creditListForInvoice(invoiceId) {
+  return state.creditNotes.filter((c) => c.status === 'validated' && c.refInvoiceId === invoiceId);
+}
+function creditedTotal(inv) {
+  return round2(creditListForInvoice(inv.id).reduce((s, c) => s + totals(c).ttc, 0));
+}
+
 function restDue(inv) {
-  return Math.max(0, round2(totals(inv).ttc - paidAmount(inv)));
+  return Math.max(0, round2(totals(inv).ttc - paidAmount(inv) - creditedTotal(inv)));
 }
 
 function isPaid(inv) { return restDue(inv) <= 0.005; }
@@ -391,6 +402,7 @@ function deleteInvoiceGuard(inv) {
   if (inv.status !== 'validated') return { ok: true };
   if (isAccounted(inv)) return { ok: false, reason: 'di.errAccounted' };
   if (paymentList(inv).length) return { ok: false, reason: 'di.errPaid' };
+  if (creditsForInvoice(inv.id).length) return { ok: false, reason: 'di.errCredited' };
   if (!isLastValidatedInvoice(inv)) return { ok: false, reason: 'di.errNotLast' };
   return { ok: true };
 }
@@ -486,6 +498,57 @@ function assignQuoteNumber(q) {
   q.number = `${prefix}-${year}-${String(seq).padStart(4, '0')}`;
 }
 
+/* ---------------- Avoirs / notes de crédit ----------------
+   Un avoir est un document validé qui vient en déduction d'une facture
+   (reste dû et TVA collectée). Numérotation contiguë distincte AV-AAAA-NNNN. */
+
+function isAccountedCredit(c) { return !!(c && c.accountedAt); }
+
+function assignCreditNumber(c) {
+  const year = String(c.issueDate || todayISO()).slice(0, 4);
+  let seq = Number(state.meta.creditSeq || 0) + 1;
+  state.meta.creditSeq = seq;
+  const prefix = String(state.settings.creditPrefix || 'AV').trim() || 'AV';
+  c.number = `${prefix}-${year}-${String(seq).padStart(4, '0')}`;
+  c.seq = seq;
+  c.seqYear = year;
+  c.status = 'validated';
+  c.validatedAt = new Date().toISOString();
+}
+
+function creditSeqOf(c) {
+  if (c && Number(c.seq)) return Number(c.seq);
+  const m = /-(\d{3,})$/.exec(String((c && c.number) || ''));
+  return m ? Number(m[1]) : 0;
+}
+
+function isLastValidatedCredit(c) {
+  const seq = creditSeqOf(c);
+  if (!seq) return false;
+  return !state.creditNotes.some((x) => x.status === 'validated' && x.id !== c.id && creditSeqOf(x) > seq);
+}
+
+/* Verrou de suppression d'un avoir : la dernière validée uniquement, non comptabilisée. */
+function deleteCreditGuard(c) {
+  if (!c) return { ok: false, reason: 'common.notFound' };
+  if (c.status !== 'validated') return { ok: true };
+  if (isAccountedCredit(c)) return { ok: false, reason: 'di.errAccounted' };
+  if (!isLastValidatedCredit(c)) return { ok: false, reason: 'cr.errNotLast' };
+  return { ok: true };
+}
+
+/* Avoirs (tous statuts) rattachés à une facture — pour l'UI. */
+function creditsForInvoice(invoiceId) {
+  return state.creditNotes.filter((c) => c.refInvoiceId === invoiceId);
+}
+
+/* Montant d'avoir validé déjà rattaché à une facture (bornes de saisie). */
+function creditedTotalOf(invoiceId) {
+  return round2(state.creditNotes
+    .filter((c) => c.status === 'validated' && c.refInvoiceId === invoiceId)
+    .reduce((s, c) => s + totals(c).ttc, 0));
+}
+
 /* ---------------- Navigation ---------------- */
 
 function showView(name) {
@@ -510,6 +573,7 @@ function renderAll() {
   renderDrafts();
   renderValidated();
   renderQuotes();
+  renderCredits();
   renderPayments();
   renderClients();
   renderRules();
@@ -768,6 +832,7 @@ function renderValidated() {
   const rows = list.map((inv) => {
     const accounted = isAccounted(inv);
     const guard = deleteInvoiceGuard(inv);
+    const credited = creditedTotal(inv);
     /* Une facture comptabilisée n'est plus modifiable ni supprimable (encaissements
        toujours possibles). Le verrou explique la raison dans son infobulle. */
     const editBtn = accounted
@@ -785,7 +850,7 @@ function renderValidated() {
       <td>${dateFR(inv.issueDate)}</td>
       <td>${dateFR(inv.dueDate)}</td>
       <td class="num"><strong>${money(totals(inv).ttc)}</strong></td>
-      <td>${payPill(inv)}<div class="muted small">${tr('inv.paidOf', { p: money(paidAmount(inv)), r: money(restDue(inv)) })}</div></td>
+      <td>${payPill(inv)}<div class="muted small">${tr('inv.paidOf', { p: money(paidAmount(inv)), r: money(restDue(inv)) })}</div>${credited > 0 ? `<div class="muted small">${tr('cr.creditedOf', { v: money(credited) })}</div>` : ''}</td>
       <td>${accounted ? `<span class="pill blue" title="${esc(tr('inv.accountedOn', { d: dateFR(String(inv.accountedAt).slice(0, 10)) }))}">${tr('inv.accounted')}</span>` : ''}</td>
       <td>
         <div class="row-actions">
@@ -793,6 +858,7 @@ function renderValidated() {
           <button class="btn small" data-action="preview-invoice" data-id="${inv.id}">${tr('common.preview')}</button>
           <button class="btn small" data-action="pdf-invoice" data-id="${inv.id}">PDF</button>
           <button class="btn small" data-action="pay-invoice" data-id="${inv.id}">${isPaid(inv) ? tr('pay.history') : tr('pay.action')}</button>
+          <button class="btn small" data-action="new-credit-from-invoice" data-id="${inv.id}">${tr('cr.create')}</button>
           ${delBtn}
         </div>
       </td>
@@ -875,6 +941,60 @@ function renderQuotes() {
     <tbody>${rows || `<tr><td colspan="7" class="empty">${tr('quo.empty')}</td></tr>`}</tbody>`;
 }
 
+/* ---------------- Avoirs (vue) ---------------- */
+
+function renderCredits() {
+  const badge = $('#credits-count');
+  const navBadge = $('#nav-credits-count');
+  const total = state.creditNotes.length;
+  if (badge) { badge.textContent = total; badge.classList.toggle('zero', total === 0); }
+  if (navBadge) { navBadge.textContent = total; navBadge.classList.toggle('zero', total === 0); }
+
+  const searchEl = $('#credit-search');
+  const filterEl = $('#credit-filter');
+  const q = searchEl ? norm(searchEl.value) : '';
+  const f = filterEl ? filterEl.value : 'all';
+
+  let list = state.creditNotes.slice();
+  if (f === 'draft') list = list.filter((c) => c.status !== 'validated');
+  else if (f === 'validated') list = list.filter((c) => c.status === 'validated');
+  if (q) list = list.filter((c) => norm((c.number || '') + ' ' + (c.clientName || '') + ' ' + (c.refNumber || '')).includes(q));
+  list.sort((a, b) => String(b.number || '').localeCompare(String(a.number || '')));
+
+  const rows = list.map((c) => {
+    const accounted = isAccountedCredit(c);
+    const guard = deleteCreditGuard(c);
+    const refInv = c.refInvoiceId ? invoiceById(c.refInvoiceId) : null;
+    const refLabel = c.refNumber || (refInv && refInv.number) || (refInv ? tr('common.draft') : '—');
+    const editBtn = accounted
+      ? `<button class="btn small" data-action="noop" disabled title="${esc(tr('di.errAccounted'))}">🔒 ${tr('common.open')}</button>`
+      : `<button class="btn small" data-action="edit-credit" data-id="${c.id}">${tr('common.open')}</button>`;
+    const delBtn = guard.ok
+      ? `<button class="btn small danger" data-action="delete-credit" data-id="${c.id}">${tr('common.delete')}</button>`
+      : `<button class="btn small" data-action="noop" disabled title="${esc(tr(guard.reason))}">🔒</button>`;
+    return `
+    <tr>
+      <td><strong>${esc(c.number || '—')}</strong>${accounted ? ` <span class="pill blue">${tr('inv.accounted')}</span>` : ''}</td>
+      <td>${esc(c.clientName || tr('common.noClient'))}</td>
+      <td>${esc(refLabel)}</td>
+      <td>${dateFR(c.issueDate)}</td>
+      <td class="num"><strong>${money(totals(c).ttc)}</strong></td>
+      <td>
+        <div class="row-actions">
+          <button class="btn small" data-action="preview-credit" data-id="${c.id}">${tr('common.preview')}</button>
+          <button class="btn small" data-action="pdf-credit" data-id="${c.id}">PDF</button>
+          ${editBtn}
+          ${delBtn}
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  $('#credit-table').innerHTML = `
+    <thead><tr><th>${tr('cr.hNumber')}</th><th>${tr('common.client')}</th><th>${tr('cr.hInvoice')}</th><th>${tr('common.date')}</th><th class="num">${tr('common.total')}</th><th></th></tr></thead>
+    <tbody>${rows || `<tr><td colspan="6" class="empty">${tr('cr.empty')}</td></tr>`}</tbody>`;
+}
+
 /* ---------------- Suivi des paiements (vue) ---------------- */
 
 function renderPayments() {
@@ -915,6 +1035,7 @@ function renderPayments() {
         <div class="row-actions">
           <button class="btn small" data-action="pay-invoice" data-id="${inv.id}">${isPaid(inv) ? tr('pay.history') : tr('pay.action')}</button>
           <button class="btn small" data-action="preview-invoice" data-id="${inv.id}">${tr('common.preview')}</button>
+          <button class="btn small" data-action="new-credit-from-invoice" data-id="${inv.id}">${tr('cr.create')}</button>
         </div>
       </td>
     </tr>`;
@@ -1033,6 +1154,7 @@ function renderSettings() {
   $('#set-delay').value = state.settings.paymentDelay !== undefined ? state.settings.paymentDelay : 30;
   $('#set-prefix').value = state.settings.invoicePrefix || 'FA';
   $('#set-quote-prefix').value = state.settings.quotePrefix || 'DV';
+  $('#set-credit-prefix').value = state.settings.creditPrefix || 'AV';
   $('#set-quote-validity').value = state.settings.quoteValidityDays !== undefined ? state.settings.quoteValidityDays : 30;
   /* Début de numérotation : modifiable UNIQUEMENT tant qu'aucune facture n'existe */
   const startNum = $('#set-startnum');
@@ -1511,6 +1633,235 @@ async function deleteAllDrafts() {
   await persist('invoices', 'transactions');
   renderAll();
   toast(tr('drafts.deleteAllDone', { n: drafts.length }), 'success');
+}
+
+/* ---------------- Éditeur d'avoir / note de crédit ---------------- */
+
+/* Fenêtre de sélection de la facture d'origine (un avoir est toujours rattaché). */
+function openCreditPicker() {
+  const invs = state.invoices
+    .filter((i) => i.status === 'validated')
+    .sort((a, b) => String(b.number || '').localeCompare(String(a.number || '')));
+  if (!invs.length) { toast(tr('cr.noInvoice'), 'error'); return; }
+  const options = invs.map((i) =>
+    `<option value="${i.id}">${esc(i.number || tr('common.draft'))} — ${esc(clientNameOf(i))} — ${money(totals(i).ttc)}</option>`).join('');
+  openModal(`
+    <h2>${tr('cr.pickTitle')}</h2>
+    <p class="modal-sub">${tr('cr.pickSub')}</p>
+    <div class="form-grid">
+      <label class="wide">${tr('cr.refInvoice')}
+        <select id="cr-pick-invoice">${options}</select>
+      </label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" id="cr-pick-cancel">${tr('common.cancel')}</button>
+      <button class="btn primary" id="cr-pick-ok">${tr('cr.new')}</button>
+    </div>`);
+  $('#cr-pick-cancel').addEventListener('click', closeModal);
+  $('#cr-pick-ok').addEventListener('click', () => {
+    const invId = $('#cr-pick-invoice').value;
+    closeModal();
+    openCreditEditor(null, invId);
+  });
+}
+
+function openCreditEditor(id, invoiceId) {
+  const existing = id ? creditById(id) : null;
+  if (id && !existing) { toast(tr('cr.notFound'), 'error'); return; }
+  if (existing && isAccountedCredit(existing)) { toast(tr('inv.lockedEdit'), 'error'); return; }
+
+  /* Facture d'origine : celle de l'avoir existant, sinon celle demandée. */
+  const refInv = existing ? (existing.refInvoiceId ? invoiceById(existing.refInvoiceId) : null)
+    : (invoiceId ? invoiceById(invoiceId) : null);
+  if (!existing && !refInv) { toast(tr('cr.noInvoice'), 'error'); return; }
+
+  const baseLines = refInv && refInv.lines && refInv.lines.length
+    ? refInv.lines.map((l) => ({ desc: l.desc, qty: l.qty, price: l.price, tva: l.tva }))
+    : [{ desc: '', qty: 1, price: 0, tva: tvaDefault() }];
+
+  const draft = existing
+    ? JSON.parse(JSON.stringify(existing))
+    : {
+        id: null,
+        status: 'draft',
+        number: null,
+        clientId: refInv ? refInv.clientId : null,
+        clientName: refInv ? (refInv.clientName || '') : '',
+        issueDate: todayISO(),
+        refInvoiceId: refInv ? refInv.id : null,
+        refNumber: refInv ? (refInv.number || '') : '',
+        reason: '',
+        lines: baseLines,
+        notes: '',
+        createdAt: new Date().toISOString(),
+        validatedAt: null
+      };
+
+  /* Bornes : le total de l'avoir ne peut dépasser le reste facturable de la
+     facture d'origine (TTC moins les autres avoirs validés). */
+  function availableFor(refInvoiceId, excludeCreditId) {
+    const inv = invoiceById(refInvoiceId);
+    if (!inv) return Infinity;
+    const others = state.creditNotes
+      .filter((c) => c.status === 'validated' && c.refInvoiceId === refInvoiceId && c.id !== excludeCreditId)
+      .reduce((s, c) => s + totals(c).ttc, 0);
+    return round2(totals(inv).ttc - others);
+  }
+
+  const clientName = refInv ? clientNameOf(refInv) : tr('common.noClient');
+  const refLabel = (refInv && refInv.number) || (existing && existing.refNumber) || tr('common.draft');
+
+  openModal(`
+    <h2>${draft.number ? esc(tr('cr.edNumber', { n: draft.number })) : tr('cr.edNew')}</h2>
+    <p class="modal-sub">${tr('cr.edSub', { n: esc(refLabel) })}</p>
+
+    <div class="form-grid">
+      <label>${tr('common.client')} <input type="text" value="${esc(clientName)}" disabled></label>
+      <label>${tr('ed.issueDate')} <input type="date" id="cre-issue" value="${esc(draft.issueDate)}"></label>
+      <label class="wide">${tr('cr.reason')} <input type="text" id="cre-reason" value="${esc(draft.reason || '')}" placeholder="${esc(tr('cr.reasonPh'))}"></label>
+      <label class="wide">${tr('cr.refInvoice')} <input type="text" value="${esc(refLabel)}" disabled></label>
+    </div>
+
+    <div class="modal-section">
+      <h3>${tr('cr.edLines')}</h3>
+      <table class="lines-table">
+        <thead>
+          <tr>
+            <th>${tr('ed.desc')}</th>
+            <th class="num">${tr('ed.qty')}</th>
+            <th class="num">${tr('ed.pu')}</th>
+            <th class="num">${tr('ed.tvaPct')}</th>
+            <th class="num">${tr('ed.totalHT')}</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="cre-lines"></tbody>
+      </table>
+      <div class="row" style="margin-top:8px">
+        <button class="btn small" id="cre-add-line">${tr('ed.addLine')}</button>
+        <span class="muted small" id="cre-avail"></span>
+      </div>
+      <div class="totals" id="cre-totals"></div>
+    </div>
+
+    <div class="modal-section">
+      <label>${tr('cr.notes')} <textarea id="cre-notes" rows="2">${esc(draft.notes || '')}</textarea></label>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn" id="cre-cancel">${tr('common.cancel')}</button>
+      <button class="btn" id="cre-save">${tr('ed.saveDraft')}</button>
+      <button class="btn success" id="cre-validate">${tr(draft.status === 'validated' ? 'common.save' : 'ed.validate')}</button>
+    </div>
+  `);
+
+  function renderLines() {
+    const tbody = $('#cre-lines');
+    tbody.innerHTML = draft.lines.map((l, i) => `
+      <tr>
+        <td><input type="text" data-i="${i}" data-f="desc" value="${esc(l.desc)}" placeholder="${tr('ed.linePh')}"></td>
+        <td class="num"><input type="number" data-i="${i}" data-f="qty" step="0.01" min="0" value="${esc(l.qty)}" style="width:80px"></td>
+        <td class="num"><input type="number" data-i="${i}" data-f="price" step="0.01" min="0" value="${esc(l.price)}" style="width:110px"></td>
+        <td class="num"><input type="text" value="${esc(l.tva)} %" disabled style="width:70px"></td>
+        <td class="num" data-total="${i}"></td>
+        <td></td>
+      </tr>`).join('');
+    renderTotals();
+  }
+
+  function renderTotals() {
+    const t = totals(draft);
+    $('#cre-totals').innerHTML = `
+      <div class="t-row"><span>${tr('ed.totalHT')}</span><span>${money(t.ht)}</span></div>
+      <div class="t-row"><span>${tr('ed.tva')}</span><span>${money(t.tva)}</span></div>
+      <div class="t-row t-total"><span>${tr('ed.totalTTC')}</span><span>${money(t.ttc)}</span></div>`;
+    draft.lines.forEach((l, i) => {
+      const cell = $(`[data-total="${i}"]`);
+      if (cell) cell.textContent = money((Number(l.qty) || 0) * (Number(l.price) || 0));
+    });
+    const availEl = $('#cre-avail');
+    if (availEl && draft.refInvoiceId) {
+      const avail = availableFor(draft.refInvoiceId, draft.id);
+      availEl.textContent = isFinite(avail) ? tr('cr.avail', { v: money(avail) }) : '';
+      availEl.style.color = (t.ttc > avail + 0.005) ? '#dc2626' : '';
+    }
+  }
+
+  renderLines();
+
+  function onLinesEdit(e) {
+    const el = e.target;
+    if (!el.dataset || !el.dataset.f) return;
+    const i = Number(el.dataset.i);
+    const f = el.dataset.f;
+    draft.lines[i][f] = (f === 'desc') ? el.value : (el.value === '' ? 0 : Number(el.value));
+    renderTotals();
+  }
+  $('#cre-lines').addEventListener('input', onLinesEdit);
+  $('#cre-lines').addEventListener('change', onLinesEdit);
+  $('#cre-add-line').addEventListener('click', () => {
+    draft.lines.push({ desc: '', qty: 1, price: 0, tva: baseLines[0] ? baseLines[0].tva : tvaDefault() });
+    renderLines();
+  });
+  $('#cre-cancel').addEventListener('click', closeModal);
+
+  async function save(validate) {
+    draft.issueDate = $('#cre-issue').value || todayISO();
+    draft.reason = $('#cre-reason').value.trim();
+    draft.notes = $('#cre-notes').value;
+    draft.lines = draft.lines.filter((l) => String(l.desc).trim() !== '' || Number(l.price) !== 0);
+    if (!draft.lines.length) { toast(tr('ed.errLine'), 'error'); return; }
+
+    if (validate) {
+      const avail = availableFor(draft.refInvoiceId, draft.id);
+      if (totals(draft).ttc > avail + 0.005) { toast(tr('cr.errExceed', { v: money(avail) }), 'error'); return; }
+      if (!draft.reason) { toast(tr('cr.errReason'), 'error'); return; }
+    }
+
+    const isNew = !draft.id;
+    if (isNew) {
+      draft.id = uid();
+      state.creditNotes.push(draft);
+    } else {
+      const idx = state.creditNotes.findIndex((c) => c.id === draft.id);
+      if (idx !== -1) state.creditNotes[idx] = draft;
+    }
+    if (validate && draft.status !== 'validated') assignCreditNumber(draft);
+
+    await persist('creditNotes', 'meta');
+    renderAll();
+    closeModal();
+    toast(validate && draft.number ? tr('cr.validated', { n: draft.number }) : tr('cr.saved'), 'success');
+  }
+  $('#cre-save').addEventListener('click', () => save(false));
+  $('#cre-validate').addEventListener('click', () => save(true));
+}
+
+async function validateCredit(id) {
+  const c = creditById(id);
+  if (!c) return;
+  if (!(await confirmBox(tr('cr.confirm', { n: c.number || money(totals(c).ttc) }), { okLabel: tr('common.validate') }))) return;
+  assignCreditNumber(c);
+  await persist('creditNotes', 'meta');
+  renderAll();
+  toast(tr('cr.validated', { n: c.number }), 'success');
+}
+
+async function deleteCredit(id) {
+  const c = creditById(id);
+  if (!c) return;
+  const guard = deleteCreditGuard(c);
+  if (!guard.ok) { toast(tr(guard.reason), 'error'); return; }
+  const label = c.number || tr('common.draft');
+  if (!(await confirmBox(tr('cr.deleteConfirm', { label }), { okLabel: tr('common.delete'), okClass: 'danger' }))) return;
+  if (c.status === 'validated') {
+    state.meta.creditSeq = Math.max(0, creditSeqOf(c) - 1);
+  }
+  state.creditNotes = state.creditNotes.filter((x) => x.id !== id);
+  await persist('creditNotes', 'meta');
+  renderAll();
+  closeModal();
+  toast(tr('cr.deleted'));
 }
 
 /* ---------------- Éditeur de devis ---------------- */
@@ -2594,7 +2945,8 @@ function applyBackupData(data) {
   state.transactions = (data && data.transactions) || [];
   state.rules = (data && data.rules) || [];
   state.quotes = (data && data.quotes) || [];
-  state.meta = (data && (data.meta && (data.meta.invoiceSeq !== undefined || data.meta.quoteSeq !== undefined))) ? data.meta : { invoiceSeq: 0, quoteSeq: 0 };
+  state.creditNotes = (data && data.creditNotes) || [];
+  state.meta = (data && (data.meta && (data.meta.invoiceSeq !== undefined || data.meta.quoteSeq !== undefined || data.meta.creditSeq !== undefined))) ? data.meta : { invoiceSeq: 0, quoteSeq: 0, creditSeq: 0 };
   if (typeof I18N !== 'undefined') I18N.setLang(state.settings.language || 'fr');
   syncLangButtons();
   renderAll();
@@ -3049,6 +3401,16 @@ document.addEventListener('click', async (e) => {
       break;
     }
     case 'delete-quote': await deleteQuote(id); break;
+    case 'edit-credit': openCreditEditor(id); break;
+    case 'validate-credit': await validateCredit(id); break;
+    case 'delete-credit': await deleteCredit(id); break;
+    case 'preview-credit': await window.factapi.creditPreview(id); break;
+    case 'pdf-credit': {
+      const res = await window.factapi.creditExportPdf(id);
+      if (res && !res.canceled) toast(tr('cr.pdfSaved', { path: res.path }), 'success');
+      break;
+    }
+    case 'new-credit-from-invoice': openCreditEditor(null, id); break;
     case 'pay-invoice': openPaymentModal(id); break;
     case 'pay-edit': openEditPaymentModal(id, el.dataset.pay); break;
     case 'pay-delete': await deletePayment(id, el.dataset.pay); break;
@@ -3143,6 +3505,10 @@ $('#btn-new-quote').addEventListener('click', () => { showView('quotes'); openQu
 /* Filtres de la liste des devis */
 $('#quote-search').addEventListener('input', renderQuotes);
 $('#quote-filter').addEventListener('change', renderQuotes);
+/* Avoirs / notes de crédit */
+$('#btn-new-credit').addEventListener('click', () => { showView('credits'); openCreditPicker(); });
+$('#credit-search').addEventListener('input', renderCredits);
+$('#credit-filter').addEventListener('change', renderCredits);
 $('#btn-new-client').addEventListener('click', () => openClientEditor(null));
 $('#btn-new-rule').addEventListener('click', () => openRuleEditor(null));
 
@@ -3430,6 +3796,7 @@ $('#btn-save-settings').addEventListener('click', async () => {
   state.settings.theme = ($('#set-theme') && $('#set-theme').value === 'dark') ? 'dark' : 'light';
   state.settings.invoicePrefix = $('#set-prefix').value.trim() || 'FA';
   state.settings.quotePrefix = $('#set-quote-prefix').value.trim() || 'DV';
+  state.settings.creditPrefix = $('#set-credit-prefix').value.trim() || 'AV';
   const qv = Math.floor(Number($('#set-quote-validity').value));
   state.settings.quoteValidityDays = (qv && qv > 0) ? qv : 30;
   /* Début de numérotation : figé dès qu'une facture existe */
@@ -3617,7 +3984,8 @@ async function loadAppData() {
     state.transactions = data.transactions || [];
     state.rules = data.rules || [];
     state.quotes = data.quotes || [];
-    state.meta = data.meta || { invoiceSeq: 0, quoteSeq: 0 };
+    state.creditNotes = data.creditNotes || [];
+    state.meta = data.meta || { invoiceSeq: 0, quoteSeq: 0, creditSeq: 0 };
     /* Réparation : factures enregistrées sans identifiant (bug antérieur) —
        sans id, l'éditeur se rouvrait vide et « Régler » ne trouvait pas la facture. */
     let repairedIds = false;

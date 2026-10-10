@@ -49,6 +49,7 @@ test('i18n : les clés référencées dans les pages HTML existent en FR et AR',
     path.join(__dirname, '..', '..', 'src', 'renderer', 'index.html'),
     path.join(__dirname, '..', '..', 'src', 'renderer', 'print-invoice.html'),
     path.join(__dirname, '..', '..', 'src', 'renderer', 'print-quote.html'),
+    path.join(__dirname, '..', '..', 'src', 'renderer', 'print-credit.html'),
     path.join(__dirname, '..', '..', 'src', 'renderer', 'print-guide.html')
   ];
   const attrs = ['data-i18n', 'data-i18n-html', 'data-i18n-ph', 'data-i18n-title', 'data-i18n-aria'];

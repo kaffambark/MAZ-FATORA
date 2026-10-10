@@ -35,6 +35,10 @@ contextBridge.exposeInMainWorld('factapi', {
   quoteExportPdf: (quoteId) => ipcRenderer.invoke('quote:export-pdf', quoteId),
   quotePreview: (quoteId) => ipcRenderer.invoke('quote:preview', quoteId),
 
+  // Avoirs / notes de crédit
+  creditExportPdf: (creditId) => ipcRenderer.invoke('credit:export-pdf', creditId),
+  creditPreview: (creditId) => ipcRenderer.invoke('credit:preview', creditId),
+
   // Guide d'utilisation imprimable
   guidePreview: (lang) => ipcRenderer.invoke('guide:preview', lang),
   guideExportPdf: (lang) => ipcRenderer.invoke('guide:export-pdf', lang),

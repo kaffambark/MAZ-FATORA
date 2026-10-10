@@ -20,7 +20,9 @@ test('store : valeurs par défaut fusionnées, écriture/relecture', () => {
   const first = store.loadAll();
   assert.strictEqual(first.settings.language, 'fr');
   assert.strictEqual(first.settings.currency, 'MAD');
-  assert.deepStrictEqual(first.meta, { invoiceSeq: 0, quoteSeq: 0 });
+  assert.deepStrictEqual(first.meta, { invoiceSeq: 0, quoteSeq: 0, creditSeq: 0 });
+  assert.ok(Array.isArray(first.creditNotes));
+  assert.strictEqual(first.creditNotes.length, 0);
 
   // Le renderer persiste l'objet settings COMPLET : on repart du chargement.
   const all = store.loadAll();
@@ -53,7 +55,7 @@ test('schéma : version initiale 0 → migration à SCHEMA_VERSION', () => {
   assert.strictEqual(again, storeMod.SCHEMA_VERSION);
 });
 
-test('schéma v1 → v2 : migration devis (collection quotes + quoteSeq)', () => {
+test('schéma v1 → vN : migrations en chaîne (devis puis avoirs)', () => {
   const dir = tmpDir();
   /* Base v1 (v1.13/v1.14) : pas de quotes, meta sans quoteSeq */
   const v1 = { version: 1 };
@@ -64,20 +66,41 @@ test('schéma v1 → v2 : migration devis (collection quotes + quoteSeq)', () =>
 
   const store = storeMod.createStore(dir);
   const v = store.migrate();
-  assert.strictEqual(v, 2);
-  assert.strictEqual(storeMod.SCHEMA_VERSION, 2, 'schéma courant = v2');
+  assert.strictEqual(v, storeMod.SCHEMA_VERSION);
+  assert.strictEqual(storeMod.SCHEMA_VERSION, 3, 'schéma courant = v3');
 
-  /* La collection quotes existe (matérialisée) et meta porte quoteSeq */
+  /* Les collections quotes ET creditNotes existent (matérialisées), meta complet */
   const all = store.loadAll();
   assert.ok(Array.isArray(all.quotes));
   assert.strictEqual(all.quotes.length, 0);
+  assert.ok(Array.isArray(all.creditNotes));
+  assert.strictEqual(all.creditNotes.length, 0);
   assert.strictEqual(all.meta.invoiceSeq, 7);
   assert.strictEqual(all.meta.quoteSeq, 0);
+  assert.strictEqual(all.meta.creditSeq, 0);
   assert.ok(fs.existsSync(path.join(dir, 'quotes.json')), 'quotes.json matérialisé');
+  assert.ok(fs.existsSync(path.join(dir, 'creditNotes.json')), 'creditNotes.json matérialisé');
 
-  /* Une base déjà en v2 ne réexécute pas la migration */
+  /* Une base déjà à jour ne réexécute pas les migrations */
   const reopened = storeMod.createStore(dir);
-  assert.strictEqual(reopened.migrate(), 2);
+  assert.strictEqual(reopened.migrate(), storeMod.SCHEMA_VERSION);
   const content = JSON.parse(fs.readFileSync(path.join(dir, 'meta.json'), 'utf8'));
-  assert.deepStrictEqual(content, { invoiceSeq: 7, quoteSeq: 0 });
+  assert.deepStrictEqual(content, { invoiceSeq: 7, quoteSeq: 0, creditSeq: 0 });
+});
+
+test('schéma v2 → v3 : migration avoirs (collection creditNotes + creditSeq)', () => {
+  const dir = tmpDir();
+  const v2 = { version: 2 };
+  fs.writeFileSync(path.join(dir, 'schema.json'), JSON.stringify(v2), 'utf8');
+  fs.writeFileSync(path.join(dir, 'meta.json'), JSON.stringify({ invoiceSeq: 3, quoteSeq: 2 }), 'utf8');
+
+  const store = storeMod.createStore(dir);
+  assert.strictEqual(store.migrate(), 3);
+  const all = store.loadAll();
+  assert.ok(Array.isArray(all.creditNotes));
+  assert.strictEqual(all.creditNotes.length, 0);
+  assert.strictEqual(all.meta.creditSeq, 0);
+  assert.strictEqual(all.meta.invoiceSeq, 3);
+  assert.strictEqual(all.meta.quoteSeq, 2);
+  assert.ok(fs.existsSync(path.join(dir, 'creditNotes.json')), 'creditNotes.json matérialisé');
 });

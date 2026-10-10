@@ -17,6 +17,8 @@ Trois modules complémentaires :
   factures validées ;
 - **Paiements** : encaissements partiels ou totaux, historique par facture, vue de suivi
   (facturé / encaissé / reste à encaisser / retards) ;
+- **Avoirs (notes de crédit)** : documents **AV‑AAAA‑NNNN** rattachés à une facture validée
+  (retour, remise, correction) ; ils réduisent le **reste dû** et la **TVA collectée** ;
 - **Sauvegarde & restauration** de toute la base à l'**emplacement de votre choix** (fichier JSON).
 
 Et une **protection de l'application** (Paramètres → Sécurité), **version monoposte** : un **mot de
@@ -47,10 +49,29 @@ npm test
 
 ## Version
 
-La **version** s'affiche en bas de la barre latérale (ex. `v1.23`). À **chaque modification** du
+La **version** s'affiche en bas de la barre latérale (ex. `v1.24`). À **chaque modification** du
 projet, le champ `version` de `package.json` est incrémenté par la **partie mineure**
 (`1.0` → `1.1` → `1.2` …) et l'application affiche `major.minor`. Les noms d'installateurs
-reprennent la version complète (`1.23.0`).
+reprennent la version complète (`1.24.0`).
+
+## v1.24 — Avoirs / notes de crédit
+
+Nouveau document **avoir** (`إشعار دائن`) pour constater un retour, une remise ou une correction
+sur une facture validée :
+
+1. **Collection `creditNotes` dédiée** (schéma de données **v3**, migration automatique) avec
+   numérotation continue **AV‑AAAA‑NNNN** (préfixe réglable dans Paramètres) et un compteur
+   distinct (`meta.creditSeq`).
+2. **Rattachement obligatoire** à une facture validée : l'avoir reprend le client et la facture
+   d'origine (`refInvoiceId` / `refNumber`), et porte un **motif**.
+3. **Impact comptable** : les avoirs **validés** réduisent le **reste dû** de la facture
+   (au même titre qu'un encaissement) et la **TVA collectée**.
+4. **Garde-fous** cohérents avec les factures : montant **borné au reste facturable**, suppression
+   du **dernier avoir uniquement**, blocage si le mois est comptabilisé, une facture liée à un
+   avoir ne peut plus être supprimée.
+5. **Document bilingue** (`print-credit.html`, accent rouge) sans tampon « Payée », avec la mention
+   « Avoir sur la facture N° … » et le montant en toutes lettres.
+6. **Aide** : nouvelle vue « Avoirs » + clés FR/AR (parité vérifiée par les tests).
 
 ## v1.23 — Fermeture d'application « pro » (4 axes)
 

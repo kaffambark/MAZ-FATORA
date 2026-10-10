@@ -85,8 +85,10 @@ const thBi = (ar, fr, cls) =>
 const WM_TEXT = { paid: 'PAYÉE', draft: 'BROUILLON', quote: 'DEVIS / AR' };
 
 (async function render() {
-  const KIND = (typeof window !== 'undefined' && window.DOC_KIND === 'quote') ? 'quote' : 'invoice';
+  const KIND = (typeof window !== 'undefined' && (window.DOC_KIND === 'quote' || window.DOC_KIND === 'credit'))
+    ? window.DOC_KIND : 'invoice';
   const isQuote = KIND === 'quote';
+  const isCredit = KIND === 'credit';
   const params = new URLSearchParams(location.search);
   const id = params.get('id');
   const root = document.getElementById('root');
@@ -100,7 +102,7 @@ const WM_TEXT = { paid: 'PAYÉE', draft: 'BROUILLON', quote: 'DEVIS / AR' };
 
     const docConf = DCONF ? DCONF.normalize(data.settings) : null;
     const tmpl = DCONF ? DCONF.templateFor(docConf, KIND) : 'classic';
-    const accent = DCONF ? DCONF.accentHex(docConf, KIND) : (isQuote ? '#0891b2' : '#2563eb');
+    const accent = DCONF ? DCONF.accentHex(docConf, KIND) : (isQuote ? '#0891b2' : (isCredit ? '#b91c1c' : '#2563eb'));
     /* Format de page à l'impression : le CSS @page par défaut est A4. */
     if (docConf && docConf.paper === 'A5') {
       const st = document.createElement('style');
@@ -108,8 +110,9 @@ const WM_TEXT = { paid: 'PAYÉE', draft: 'BROUILLON', quote: 'DEVIS / AR' };
       document.head.appendChild(st);
     }
     const b = docConf ? docConf.blocks : { logo: 1, nameAr: 1, ids: { ice: 1, if: 1, rc: 1, patente: 1, cnss: 1, tva: 1 }, clientIds: 1, tvaDetail: 1, regime: 1, rib: 1, notes: 1, words: 'both', legal: 1, signature: 0, dueDate: 1, validity: 1, colsQty: 1, colsPu: 1, colsTva: 1, colsTotal: 1 };
-    const doc = isQuote ? (data.quotes || []).find((q) => q.id === id) : (data.invoices || []).find((i) => i.id === id);
-    if (!doc) throw new Error(I18N.tr(isQuote ? 'quo.notFound' : 'pi.notFound'));
+    const doc = isQuote ? (data.quotes || []).find((q) => q.id === id)
+      : (isCredit ? (data.creditNotes || []).find((c) => c.id === id) : (data.invoices || []).find((i) => i.id === id));
+    if (!doc) throw new Error(I18N.tr(isQuote ? 'quo.notFound' : (isCredit ? 'cr.notFound' : 'pi.notFound')));
 
     CUR = (data.settings && data.settings.currency) || 'MAD';
     const co = (data.settings && data.settings.company) || {};
@@ -172,21 +175,28 @@ const WM_TEXT = { paid: 'PAYÉE', draft: 'BROUILLON', quote: 'DEVIS / AR' };
     }).join('');
 
     /* --- Titres --- */
-    const titleFr = isQuote ? 'DEVIS' : 'FACTURE';
-    const titleAr = isQuote ? 'عرض الثمن' : 'فاتورة';
-    const docNumber = isQuote ? (doc.number || 'Devis') : (doc.number || I18N.tr('pi.draftTitle'));
-    const tbTitle = doc.number || (isQuote ? 'Devis' : I18N.tr('pi.draftTitle'));
+    const titleFr = isQuote ? 'DEVIS' : (isCredit ? 'AVOIR' : 'FACTURE');
+    const titleAr = isQuote ? 'عرض الثمن' : (isCredit ? 'إشعار دائن' : 'فاتورة');
+    const draftTitle = isCredit ? I18N.tr('cr.draftTitle') : I18N.tr('pi.draftTitle');
+    const docNumber = doc.number || (isQuote ? 'Devis' : draftTitle);
+    const tbTitle = doc.number || (isQuote ? 'Devis' : draftTitle);
     document.title = docNumber;
     document.getElementById('tb-title').textContent = tbTitle;
 
-    /* --- Méta (n°, date, échéance OU validité) --- */
+    /* --- Méta (n°, date, échéance OU validité, facture d'origine pour un avoir) --- */
     const metaRows = [];
-    metaRows.push(`<tr><td class="ar" dir="rtl">${isQuote ? 'رقم العرض' : 'رقم الفاتورة'}</td><td class="fr">${isQuote ? 'N° devis' : 'N° facture'}</td><td class="v">${esc(isQuote ? (doc.number || '—') : (doc.number || 'Brouillon'))}</td></tr>`);
-    metaRows.push(`<tr><td class="ar" dir="rtl">${isQuote ? 'تاريخ العرض' : 'تاريخ الفاتورة'}</td><td class="fr">Date</td><td class="v">${dateFR(doc.issueDate)}</td></tr>`);
+    const numAr = isQuote ? 'رقم العرض' : (isCredit ? 'رقم الإشعار' : 'رقم الفاتورة');
+    const numFr = isQuote ? 'N° devis' : (isCredit ? "N° avoir" : 'N° facture');
+    const dateAr = isQuote ? 'تاريخ العرض' : (isCredit ? 'تاريخ الإشعار' : 'تاريخ الفاتورة');
+    metaRows.push(`<tr><td class="ar" dir="rtl">${numAr}</td><td class="fr">${numFr}</td><td class="v">${esc(isQuote ? (doc.number || '—') : (doc.number || draftTitle))}</td></tr>`);
+    metaRows.push(`<tr><td class="ar" dir="rtl">${dateAr}</td><td class="fr">Date</td><td class="v">${dateFR(doc.issueDate)}</td></tr>`);
     if (isQuote && b.validity) {
       metaRows.push(`<tr><td class="ar" dir="rtl">آخر أجل للصلاحية</td><td class="fr">Validité</td><td class="v">${dateFR(doc.validUntil)}</td></tr>`);
     }
-    if (!isQuote && b.dueDate) {
+    if (isCredit && doc.refNumber) {
+      metaRows.push(`<tr><td class="ar" dir="rtl">الفاتورة الأصلية</td><td class="fr">Facture d'origine</td><td class="v">${esc(doc.refNumber)}</td></tr>`);
+    }
+    if (!isQuote && !isCredit && b.dueDate) {
       metaRows.push(`<tr><td class="ar" dir="rtl">أجل الأداء</td><td class="fr">Échéance</td><td class="v">${dateFR(doc.dueDate)}</td></tr>`);
     }
 
@@ -195,10 +205,14 @@ const WM_TEXT = { paid: 'PAYÉE', draft: 'BROUILLON', quote: 'DEVIS / AR' };
     const ribLine = (b.rib && co.iban) ? (isQuote ? 'Mode de règlement (si accepté) : virement — RIB : ' : 'Mode de règlement : virement — RIB : ') + esc(co.iban) + '<br>' : '';
     const defaultTermsFr = isQuote
       ? 'Devis sans engagement de vente — les prix et conditions sont valables jusqu\'à la date de validité indiquée ci-dessus, dans le respect de la réglementation en vigueur au Royaume du Maroc.'
-      : 'En cas de retard de paiement, application des pénalités prévues par la réglementation en vigueur au Royaume du Maroc. Escompte pour paiement anticipé : néant.';
+      : (isCredit
+        ? 'Le présent avoir est émis conformément à la réglementation en vigueur au Royaume du Maroc. Aucun escompte pour paiement anticipé.'
+        : 'En cas de retard de paiement, application des pénalités prévues par la réglementation en vigueur au Royaume du Maroc. Escompte pour paiement anticipé : néant.');
     const defaultTermsAr = isQuote
       ? 'عرض غير ملزم بالبيع — الأسعار والشروط صالحة إلى غاية التاريخ المذكور أعلاه.'
-      : 'في حالة التأخر في الأداء، تُطبَّق الجزاءات المنصوص عليها في التشريع الجاري به العمل.';
+      : (isCredit
+        ? 'حُرِّر هذا الإشعار الدائن طبقا للتشريع الجاري به العمل بالمملكة المغربية.'
+        : 'في حالة التأخر في الأداء، تُطبَّق الجزاءات المنصوص عليها في التشريع الجاري به العمل.');
     const termsFr = (docConf && has(docConf.texts.terms)) ? docConf.texts.terms : defaultTermsFr;
     const termsAr = (docConf && has(docConf.texts.terms)) ? '' : defaultTermsAr;
     const mentionsBlock = b.legal ? `<div class="mentions">${ribLine}${esc(termsFr)}${termsAr ? ` <span class="ar" dir="rtl" style="display:block;margin-top:4px">${esc(termsAr)}</span>` : ''}</div>` : (ribLine ? `<div class="mentions">${ribLine}</div>` : '');
@@ -208,10 +222,18 @@ const WM_TEXT = { paid: 'PAYÉE', draft: 'BROUILLON', quote: 'DEVIS / AR' };
     let wordsBlock = '';
     if (wordsMode !== 'none') {
       const arLine = (wordsMode === 'ar' || wordsMode === 'both')
-        ? `<div class="ar-line" dir="rtl">${isQuote ? 'أوقفت هذا العرض على مبلغ :' : 'أوقفت هذه الفاتورة على مبلغ :'} ${esc(WORDINGS.ar(t.ttc))}</div>` : '';
+        ? `<div class="ar-line" dir="rtl">${isQuote ? 'أوقفت هذا العرض على مبلغ :' : (isCredit ? 'أوقفت هذا الإشعار الدائن على مبلغ :' : 'أوقفت هذه الفاتورة على مبلغ :')} ${esc(WORDINGS.ar(t.ttc))}</div>` : '';
       const frLine = (wordsMode === 'fr' || wordsMode === 'both')
-        ? `<div class="fr-line">${isQuote ? 'Arrêté le présent devis à la somme de :' : 'Arrêtée la présente facture à la somme de :'} ${esc(WORDINGS.fr(t.ttc))}</div>` : '';
+        ? `<div class="fr-line">${isQuote ? 'Arrêté le présent devis à la somme de :' : (isCredit ? 'Arrêté le présent avoir à la somme de :' : 'Arrêtée la présente facture à la somme de :')} ${esc(WORDINGS.fr(t.ttc))}</div>` : '';
       wordsBlock = `<div class="words"><div class="lbl"><span class="ar" dir="rtl">المبلغ بالحروف</span> <span class="fr">/ Montant en toutes lettres</span></div>${arLine}${frLine}</div>`;
+    }
+
+    /* --- Mention « avoir » : référence à la facture d'origine + motif --- */
+    let creditLine = '';
+    if (isCredit) {
+      const ref = doc.refNumber ? I18N.tr('cr.refDoc', { n: doc.refNumber }) : '';
+      const reason = doc.reason ? `${I18N.tr('cr.reasonLabel')} ${esc(doc.reason)}` : '';
+      creditLine = `<div class="validity" style="border-color:${accent};background:#fff1f2;color:#991b1b">${ref ? `<span class="ar" dir="rtl">إشعار على الفاتورة :</span> ${esc(ref)}` : ''}${reason ? `${ref ? '<br>' : ''}${reason}` : ''}</div>`;
     }
 
     /* --- Mention « converti » (devis) --- */
@@ -252,7 +274,7 @@ const WM_TEXT = { paid: 'PAYÉE', draft: 'BROUILLON', quote: 'DEVIS / AR' };
     ].join(';');
 
     /* --- Bandeau « acquitté » (facture payée) --- */
-    const paidBadge = (!isQuote && doc.paid) ? '<div class="badge-paid" role="note" aria-label="Payée">PAYÉE <span class="ar">مدفوعة</span></div>' : '';
+    const paidBadge = (!isQuote && !isCredit && doc.paid) ? '<div class="badge-paid" role="note" aria-label="Payée">PAYÉE <span class="ar">مدفوعة</span></div>' : '';
 
     /* --- En-tête libre --- */
     const headNote = (docConf && has(docConf.texts.header)) ? `<div class="doc-note">${esc(docConf.texts.header)}</div>` : '';
@@ -260,7 +282,9 @@ const WM_TEXT = { paid: 'PAYÉE', draft: 'BROUILLON', quote: 'DEVIS / AR' };
     /* --- Pied --- */
     const legalDefault = isQuote
       ? { fr: 'Devis établi — TVA selon la réglementation en vigueur au Royaume du Maroc.', ar: 'عرض محرر طبقا للتشريع المغربي الجاري به العمل.' }
-      : { fr: 'Facture régulièrement émise — TVA selon la réglementation en vigueur au Royaume du Maroc.', ar: 'فاتورة محررة طبقا للتشريع المغربي الجاري به العمل.' };
+      : (isCredit
+        ? { fr: "Avoir régulièrement émis — TVA selon la réglementation en vigueur au Royaume du Maroc.", ar: 'إشعار دائن محرر طبقا للتشريع المغربي الجاري به العمل.' }
+        : { fr: 'Facture régulièrement émise — TVA selon la réglementation en vigueur au Royaume du Maroc.', ar: 'فاتورة محررة طبقا للتشريع المغربي الجاري به العمل.' });
     const footFr = (docConf && has(docConf.texts.footer)) ? docConf.texts.footer : legalDefault.fr;
     const footAr = (docConf && has(docConf.texts.footer)) ? '' : legalDefault.ar;
 
@@ -284,7 +308,7 @@ const WM_TEXT = { paid: 'PAYÉE', draft: 'BROUILLON', quote: 'DEVIS / AR' };
 
         ${b.clientIds ? `<div class="parties">
           <div class="client-box">
-            <div class="lbl"><span class="ar" dir="rtl">${isQuote ? 'عرض إلى' : 'فاتورة إلى'}</span> <span class="fr">/ ${isQuote ? 'Devis à' : 'Facturé à'}</span></div>
+            <div class="lbl"><span class="ar" dir="rtl">${isQuote ? 'عرض إلى' : (isCredit ? 'إشعار إلى' : 'فاتورة إلى')}</span> <span class="fr">/ ${isQuote ? 'Devis à' : (isCredit ? 'Avoir à' : 'Facturé à')}</span></div>
             ${clientLines.map((l, i) => `<div class="${i === 0 ? 'cname' : ''}">${l}</div>`).join('')}
             ${client && client.tvaNumber ? `<div class="cmeta">N° TVA / ICE : ${esc(client.tvaNumber)}</div>` : ''}
           </div>
@@ -297,7 +321,7 @@ const WM_TEXT = { paid: 'PAYÉE', draft: 'BROUILLON', quote: 'DEVIS / AR' };
 
         <div class="bottom">
           <div class="notes">
-            ${convLine}${validityBlock}
+            ${creditLine}${convLine}${validityBlock}
             ${b.notes && doc.notes ? `<strong>Note :</strong> ${esc(doc.notes)}` : ''}
             ${wordsBlock}
             ${b.regime ? `<div class="regime"><strong>Régime de TVA :</strong> ${esc(regime.fr)}${regime.ar ? ` <span class="ar" dir="rtl"> — ${esc(regime.ar)}</span>` : ''}</div>` : ''}

@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;">
+  <title>Avoir</title>
+  <link rel="stylesheet" href="print-doc.css">
+</head>
+<body>
+  <div class="toolbar">
+    <span class="spacer" id="tb-title" data-i18n="main.winCredit">Avoir</span>
+    <button id="btn-close" data-i18n="common.close">Fermer</button>
+    <button id="btn-pdf" data-i18n="common.pdf">Enregistrer en PDF…</button>
+    <button id="btn-print" class="primary" data-i18n="common.print">Imprimer</button>
+  </div>
+  <div id="root" data-i18n="common.loading">Chargement…</div>
+  <script src="words.js"></script>
+  <script src="i18n.js"></script>
+  <script src="doc-config.js"></script>
+  <script src="print-credit.js"></script>
+  <script src="print-doc.js"></script>
+</body>
+</html>
