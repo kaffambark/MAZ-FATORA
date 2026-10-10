@@ -171,19 +171,26 @@ function createMainWindow() {
 }
 
 async function buildInvoiceWindow(id, visible) {
-  return buildDocWindow('print-invoice.html', id, visible);
+  return buildDocWindow('print-invoice.html', { id }, visible);
 }
 
-/* Fenêtre d'aperçu / PDF partagée (facture OU devis) : le renderer charge
-   print-invoice.html ou print-quote.html et prévient via « invoice:ready »
-   (canal commun, résolu par readyWaiters clé par webContents.id). */
-async function buildDocWindow(htmlFile, id, visible) {
-  const isQuote = htmlFile === 'print-quote.html';
+/* Fenêtre du guide d'utilisation (aperçu / PDF), bilingue. */
+async function buildGuideWindow(lang, visible) {
+  return buildDocWindow('print-guide.html', { lang: lang === 'ar' ? 'ar' : 'fr' }, visible);
+}
+
+/* Fenêtre d'aperçu / PDF partagée (facture, devis OU guide) : le renderer
+   charge l'un des print-*.html et prévient via « invoice:ready » (canal
+   commun, résolu par readyWaiters clé par webContents.id). `query` porte les
+   paramètres de l'URL ({ id } ou { lang }). */
+async function buildDocWindow(htmlFile, query, visible) {
+  const title = htmlFile === 'print-quote.html' ? I18N.tr('main.winQuote')
+    : (htmlFile === 'print-guide.html' ? I18N.tr('main.winGuide') : I18N.tr('main.winInvoice'));
   const win = new BrowserWindow({
     show: visible,
     width: 940,
     height: 1300,
-    title: isQuote ? I18N.tr('main.winQuote') : I18N.tr('main.winInvoice'),
+    title,
     backgroundColor: '#ffffff',
     webPreferences: {
       preload: PRELOAD,
@@ -218,7 +225,7 @@ async function buildDocWindow(htmlFile, id, visible) {
     win.once('closed', onClosed);
   });
 
-  await win.loadFile(path.join(RENDERER_DIR, htmlFile), { query: { id } });
+  await win.loadFile(path.join(RENDERER_DIR, htmlFile), { query: query || {} });
   armLogging(win);
   await ready;
   return win;
@@ -228,22 +235,25 @@ function ipcWindow(event) {
   return BrowserWindow.fromWebContents(event.sender);
 }
 
-async function printToPdf(win) {
+async function printToPdf(win, override) {
   if (!win || win.isDestroyed()) throw new Error(I18N.tr('main.renderTimeout'));
   /* Format / marges du PDF d'après le « Modèle des documents » choisi.
      Le schéma complet vit dans src/renderer/doc-config.js ; côté processus
-     principal on se contente de lire les quelques champs utiles. */
+     principal on se contente de lire les quelques champs utiles.
+     `override` force le format/les marges (ex. guide : A4, marges fixes). */
   let doc = null;
   try { const all = store && store.loadAll(); doc = all && all.settings && all.settings.doc; } catch (e) { /* valeurs par défaut */ }
-  const pageSize = (doc && doc.paper === 'A5') ? 'A5' : 'A4';
-  const m = (doc && doc.margins) || 'normal';
-  const side = m === 'narrow' ? 0.25 : (m === 'wide' ? 0.6 : 0.4);
-  const vert = m === 'narrow' ? 0.25 : (m === 'wide' ? 0.6 : 0.35);
-  return win.webContents.printToPDF({
-    printBackground: true,
-    pageSize,
-    margins: { top: vert, bottom: vert, left: side, right: side }
-  });
+  const pageSize = (override && override.pageSize) || ((doc && doc.paper === 'A5') ? 'A5' : 'A4');
+  let margins;
+  if (override && override.margins) {
+    margins = override.margins;
+  } else {
+    const m = (doc && doc.margins) || 'normal';
+    const side = m === 'narrow' ? 0.25 : (m === 'wide' ? 0.6 : 0.4);
+    const vert = m === 'narrow' ? 0.25 : (m === 'wide' ? 0.6 : 0.35);
+    margins = { top: vert, bottom: vert, left: side, right: side };
+  }
+  return win.webContents.printToPDF({ printBackground: true, pageSize, margins });
 }
 
 function registerIpc() {
@@ -564,7 +574,7 @@ function registerIpc() {
     const quote = data.quotes.find((q) => q.id === quoteId);
     let win = null;
     try {
-      win = await buildDocWindow('print-quote.html', quoteId, false);
+      win = await buildDocWindow('print-quote.html', { id: quoteId }, false);
       const pdf = await printToPdf(win);
       const suggested = (quote && (quote.number || 'devis')) + '.pdf';
       const save = await dialog.showSaveDialog(parent, {
@@ -582,8 +592,46 @@ function registerIpc() {
 
   ipcMain.handle('quote:preview', gated(async (event, quoteId) => {
     try {
-      const win = await buildDocWindow('print-quote.html', quoteId, true);
+      const win = await buildDocWindow('print-quote.html', { id: quoteId }, true);
       win.setTitle(I18N.tr('main.winQuote'));
+      win.focus();
+      return true;
+    } catch (e) {
+      const parent = ipcWindow(event);
+      dialog.showErrorBox(I18N.tr('main.previewFail'), String(e && e.message ? e.message : e));
+      return false;
+    }
+  }));
+
+  /* --- Guide d'utilisation : aperçu et sauvegarde en PDF (print-guide.html) --- */
+  ipcMain.handle('guide:export-pdf', gated(async (event, lang) => {
+    const parent = ipcWindow(event);
+    let win = null;
+    try {
+      win = await buildGuideWindow(lang, false);
+      /* Le guide a ses propres marges (indépendantes du modèle des documents). */
+      const pdf = await printToPdf(win, {
+        pageSize: 'A4',
+        margins: { top: 0.5, bottom: 0.5, left: 0.5, right: 0.5 }
+      });
+      const suggested = 'MAZ-FATORA-Guide-' + (lang === 'ar' ? 'AR' : 'FR') + '.pdf';
+      const save = await dialog.showSaveDialog(parent, {
+        title: I18N.tr('main.saveGuidePdf'),
+        defaultPath: suggested,
+        filters: [{ name: 'PDF', extensions: ['pdf'] }]
+      });
+      if (save.canceled || !save.filePath) return { canceled: true };
+      fs.writeFileSync(save.filePath, pdf);
+      return { canceled: false, path: save.filePath };
+    } finally {
+      if (win && !win.isDestroyed()) win.destroy();
+    }
+  }));
+
+  ipcMain.handle('guide:preview', gated(async (event, lang) => {
+    try {
+      const win = await buildGuideWindow(lang, true);
+      win.setTitle(I18N.tr('main.winGuide'));
       win.focus();
       return true;
     } catch (e) {

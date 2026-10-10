@@ -204,7 +204,7 @@ ipcMain.handle('export:close-period', async (event, period) => {
   const pack = exportPack.buildPack(storeStub, {
     from: period && period.from,
     to: period && period.to,
-    appVersion: '1.20'
+    appVersion: '1.21'
   });
   const zipPath = path.join(__dirname, '.tmp', pack.base + '_cloture.zip');
   fs.writeFileSync(zipPath, exportPack.zipBuffer(pack.files));
@@ -212,7 +212,7 @@ ipcMain.handle('export:close-period', async (event, period) => {
 });
 
 /* Version de l'application (lue dans package.json par le vrai main.js) */
-ipcMain.handle('app:version', () => '1.20');
+ipcMain.handle('app:version', () => '1.21');
 
 function check(name, cond, detail) {
   if (cond) console.log('  ok   ' + name);
@@ -276,7 +276,7 @@ async function phaseUi() {
   check('logo posé sur fond blanc (lisibilité sur la sidebar bleue)',
     base.brandBg === 'rgb(255, 255, 255)', base.brandBg);
   check('favicon Icon.png déclaré', /Icon\.png/.test(base.favicon || ''), base.favicon);
-  check('version affichée dans la sidebar (v1.20)', base.version === 'v1.20', base.version);
+  check('version affichée dans la sidebar (v1.21)', base.version === 'v1.21', base.version);
   check('tableau de bord rempli', base.dashRendered);
   check('parseur CSV', !base.csvError && base.csv && base.csv.length === 3 &&
     base.csv[0].amount === 1200.5 && base.csv[1].amount === -25.5 && base.csv[2].amount === 34.99, base.csv || base.csvError);
@@ -2879,6 +2879,62 @@ async function phaseOnboarding(win) {
   await ev(win, `document.querySelector('#tour-skip').click(); window.I18N.setLang('fr'); true`);
 }
 
+/* ---- PHASE 1j : GUIDE D'UTILISATION IMPRIMABLE (v1.21) ----
+   Vérifie le rendu du guide depuis help-content.js (couverture, sommaire,
+   articles, aide-mémoire), la version arabe (RTL), l'export PDF et les
+   déclencheurs Paramètres → Aide. */
+async function phaseGuide(win) {
+  console.log('--- PHASE 1j : GUIDE D\'UTILISATION (v1.21) ---');
+
+  const guidePath = path.join(__dirname, '..', 'src', 'renderer', 'print-guide.html');
+  const waitRendered = async () => {
+    for (let i = 0; i < 40; i += 1) {
+      const n = await ev(win, `document.querySelectorAll('#root .g-art').length`);
+      if (n > 0) return;
+      await wait(100);
+    }
+  };
+
+  await win.loadFile(guidePath, { query: { lang: 'fr' } });
+  await waitRendered();
+  const fr = await ev(win, `(function () {
+    const cover = document.querySelector('.g-cover');
+    return {
+      dir: document.documentElement.getAttribute('dir'),
+      title: (document.querySelector('.g-cover-title') || {}).textContent || '',
+      toc: !!document.querySelector('.g-toc'),
+      memo: !!document.querySelector('.g-memo'),
+      articles: document.querySelectorAll('#root .g-art').length,
+      coverText: cover ? cover.textContent : ''
+    };
+  })()`);
+  check('guide : couverture, sommaire, articles et aide-mémoire rendus (FR)',
+    fr.dir === 'ltr' && fr.title === 'Guide d’utilisation' && fr.toc && fr.memo && fr.articles >= 40, fr);
+  check('guide : version affichée sur la couverture', /v1\.21/.test(fr.coverText), fr.coverText.slice(0, 100));
+
+  const pdf = await win.webContents.printToPDF({ printBackground: true, pageSize: 'A4' });
+  check('guide : export PDF non vide (%PDF)',
+    pdf && pdf.length > 20000 && pdf.slice(0, 4).toString() === '%PDF', { size: pdf ? pdf.length : 0 });
+
+  await win.loadFile(guidePath, { query: { lang: 'ar' } });
+  await waitRendered();
+  const ar = await ev(win, `({
+    dir: document.documentElement.getAttribute('dir'),
+    title: (document.querySelector('.g-cover-title') || {}).textContent || ''
+  })`);
+  check('guide : version arabe en RTL', ar.dir === 'rtl' && ar.title === 'دليل الاستعمال', ar);
+
+  await win.loadFile(path.join(__dirname, '..', 'src', 'renderer', 'index.html'));
+  await wait(900);
+  const wires = await ev(win, `({
+    open: !!document.querySelector('#btn-guide-open'),
+    pdf: !!document.querySelector('#btn-guide-pdf'),
+    api: typeof window.factapi.guidePreview === 'function' && typeof window.factapi.guideExportPdf === 'function'
+  })`);
+  check('guide : boutons Paramètres → Aide et API guide disponibles',
+    wires.open && wires.pdf && wires.api, wires);
+}
+
 (async function main() {
   try {
     await app.whenReady();
@@ -2898,6 +2954,7 @@ async function phaseOnboarding(win) {
     await phaseComptabilisation(uiWin);
     await phaseDocModel(uiWin);
     await phaseOnboarding(uiWin);
+    await phaseGuide(uiWin);
     await phaseHelp(uiWin);
   } catch (e) {
     problems.push('exception: ' + (e && e.stack ? e.stack : e));

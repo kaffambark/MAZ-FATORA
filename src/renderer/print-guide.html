@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;">
+  <title>Guide d'utilisation</title>
+  <link rel="stylesheet" href="print-guide.css">
+</head>
+<body>
+  <div class="toolbar">
+    <span class="spacer" data-i18n="guide.title">Guide d’utilisation</span>
+    <button id="btn-close" data-i18n="common.close">Fermer</button>
+    <button id="btn-pdf" data-i18n="common.pdf">Enregistrer en PDF…</button>
+    <button id="btn-print" class="primary" data-i18n="common.print">Imprimer</button>
+  </div>
+  <div id="root" data-i18n="common.loading">Chargement…</div>
+  <script src="i18n.js"></script>
+  <script src="help-content.js"></script>
+  <script src="print-guide.js"></script>
+</body>
+</html>

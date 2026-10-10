@@ -2465,6 +2465,10 @@ async function deleteRule(id) {
 
 /* ---------------- Langue (FR ⇄ AR) ---------------- */
 
+function currentLang() {
+  return (typeof I18N !== 'undefined' && I18N.getLang) ? I18N.getLang() : 'fr';
+}
+
 function syncLangButtons() {
   const lang = (typeof I18N !== 'undefined') ? I18N.getLang() : 'fr';
   $$('.lang-btn').forEach((b) => b.classList.toggle('active', b.dataset.lang === lang));
@@ -3400,6 +3404,29 @@ $('#btn-hide-welcome').addEventListener('click', () => {
 const tourRestartBtn = $('#btn-tour-restart');
 if (tourRestartBtn) tourRestartBtn.addEventListener('click', () => {
   if (window.ONBOARD) window.ONBOARD.start();
+});
+
+/* ---- Guide d'utilisation : aperçu et export PDF (Paramètres → Aide) ---- */
+const guideOpenBtn = $('#btn-guide-open');
+if (guideOpenBtn) guideOpenBtn.addEventListener('click', async () => {
+  try {
+    const ok = await window.factapi.guidePreview(currentLang());
+    if (ok === false) toast(tr('main.previewFail'), 'error');
+  } catch (e) {
+    toast(tr('main.previewFail'), 'error');
+  }
+});
+
+const guidePdfBtn = $('#btn-guide-pdf');
+if (guidePdfBtn) guidePdfBtn.addEventListener('click', async () => {
+  try {
+    const res = await window.factapi.guideExportPdf(currentLang());
+    if (!res || res.canceled) return;
+    if (res.error) { toast(tr('set.exportFail', { msg: res.msg || res.error }), 'error'); return; }
+    toast(tr('set.exportDone', { path: res.path }), 'success');
+  } catch (e) {
+    toast(tr('set.exportFail', { msg: e.message }), 'error');
+  }
 });
 
 /* ---- Sélecteur de mois du tableau de bord ---- */

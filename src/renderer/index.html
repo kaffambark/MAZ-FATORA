@@ -776,7 +776,14 @@
         <!-- AIDE : visite guidée + guide d'utilisation -->
         <div class="card" id="card-help">
           <div class="card-head"><h2 data-i18n="set.helpCard">Aide</h2></div>
-          <div class="row" style="margin-top:6px">
+          <p class="hint" data-i18n="set.helpHint">Le guide reprend tout le contenu du centre d’aide, prêt à imprimer ou à archiver.</p>
+          <div class="row" style="margin-top:10px">
+            <button class="btn primary" id="btn-guide-open">
+              <svg class="ic"><use href="#i-file"/></svg><span data-i18n="set.helpOpen">Ouvrir le guide d’utilisation</span>
+            </button>
+            <button class="btn" id="btn-guide-pdf">
+              <svg class="ic"><use href="#i-download"/></svg><span data-i18n="set.helpPdf">Enregistrer le guide en PDF…</span>
+            </button>
             <button class="btn" id="btn-tour-restart">
               <svg class="ic"><use href="#i-help"/></svg><span data-i18n="set.helpTour">Revoir la visite guidée</span>
             </button>

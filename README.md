@@ -47,10 +47,24 @@ npm test
 
 ## Version
 
-La **version** s'affiche en bas de la barre latérale (ex. `v1.20`). À **chaque modification** du
+La **version** s'affiche en bas de la barre latérale (ex. `v1.21`). À **chaque modification** du
 projet, le champ `version` de `package.json` est incrémenté par la **partie mineure**
 (`1.0` → `1.1` → `1.2` …) et l'application affiche `major.minor`. Les noms d'installateurs
-reprennent la version complète (`1.20.0`).
+reprennent la version complète (`1.21.0`).
+
+## v1.21 — Guide d'utilisation imprimable (bilingue, PDF)
+
+Un **guide complet** généré depuis le **contenu unique** du Centre d'aide, prêt à imprimer ou à
+archiver — **aucune ressource réseau** :
+
+- **Paramètres → Aide** : *Ouvrir le guide d'utilisation* (aperçu) et *Enregistrer le guide en
+  PDF…* ; nom de fichier `MAZ-FATORA-Guide-FR.pdf` / `…-AR.pdf` ;
+- Structure : **couverture** (version + date), **sommaire**, **articles par catégorie**
+  (démarrage, écrans, tâches, FAQ, glossaire) puis **aide-mémoire** d'une page (tableau des
+  écrans + raccourcis) ;
+- **Bilingue FR/AR** : la langue suit celle de l'application, avec bascule **RTL** en arabe ;
+- Le guide est rendu à la demande par `print-guide.js` (fonction pure testée) dans une fenêtre
+  d'impression dédiée (`print-guide.html`), réutilisant l'export PDF/impression existant.
 
 ## v1.20 — Mise en route guidée (onboarding bilingue)
 
@@ -526,6 +540,7 @@ src/
     print-doc.js        Moteur de rendu unique des documents (facture OU devis)
     print-invoice.*     Entrée impression FACTURE (type + moteur partagé)
     print-quote.*       Entrée impression DEVIS (type + moteur partagé)
+    print-guide.*       Guide d'utilisation imprimable (rendu depuis help-content.js)
 test/
   smoke.js              npm test : UI + langue FR/AR + facture bilingue + facture manuelle,
                         paiements, sauvegarde/restauration + extraction PDF,

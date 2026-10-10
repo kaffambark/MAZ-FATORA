@@ -1,0 +1,128 @@
+/* MAZ-FATORA — styles du guide d'utilisation imprimable (print-guide.js).
+   Feuille autonome (la fenêtre d'impression ne charge pas styles.css) :
+   A4, sauts de page par catégorie, RTL pour l'arabe. */
+
+:root {
+  --g-accent: #2563eb;
+  --g-ink: #0f172a;
+  --g-soft: #475569;
+  --g-line: #d8dee9;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: var(--g-ink);
+  background: #eef2f7;
+  font-size: 13px;
+  line-height: 1.5;
+}
+[dir="rtl"] body { font-family: "Geeza Pro", "Noto Naskh Arabic", Tahoma, serif; }
+
+/* --- Barre d'outils (écran uniquement) --- */
+.toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #0f172a;
+  color: #fff;
+}
+.toolbar .spacer { flex: 1; font-weight: 600; }
+.toolbar button {
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, .25);
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+}
+.toolbar button.primary { background: var(--g-accent); border-color: var(--g-accent); }
+
+/* --- Feuille --- */
+#root { padding: 22px; }
+.g-doc {
+  background: #fff;
+  width: 210mm;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 16mm;
+  box-shadow: 0 6px 26px rgba(2, 6, 23, .14);
+}
+
+/* Couverture */
+.g-cover {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  min-height: 240mm;
+}
+.g-brand { font-size: 26px; font-weight: 800; letter-spacing: .5px; color: var(--g-accent); }
+.g-cover-title { font-size: 34px; margin: 22px 0 8px; }
+.g-cover-sub { font-size: 15px; color: var(--g-soft); margin: 0; }
+.g-cover-meta { font-size: 12px; color: var(--g-soft); margin-top: 32px; }
+
+/* Titres */
+.g-cat-title {
+  font-size: 21px;
+  border-bottom: 2px solid var(--g-accent);
+  padding-bottom: 6px;
+  margin: 0 0 12px;
+}
+
+/* Sommaire */
+.g-toc-cat { margin: 14px 0; }
+.g-toc-cat h3 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--g-soft);
+  margin: 0 0 4px;
+}
+.g-toc-cat ul { list-style: none; margin: 0; padding: 0; }
+.g-toc-cat li { padding: 2px 0; }
+
+/* Article */
+.g-art { margin: 16px 0 20px; }
+.g-art-title { font-size: 16px; margin: 0 0 4px; }
+.g-goal { color: var(--g-soft); margin: 0 0 8px; }
+.g-block { margin: 8px 0; break-inside: avoid; }
+.g-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--g-soft);
+  font-weight: 700;
+  margin: 0 0 3px;
+}
+.g-block ul, .g-block ol { margin: 0; padding-inline-start: 20px; }
+.g-block li { margin: 2px 0; }
+
+/* Aide-mémoire */
+.g-memo-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+.g-memo-table th, .g-memo-table td {
+  border: 1px solid var(--g-line);
+  padding: 6px 8px;
+  text-align: start;
+  vertical-align: top;
+  font-size: 12px;
+}
+.g-memo-table th { background: #f1f5f9; }
+
+/* --- Impression --- */
+@page { size: A4; margin: 14mm; }
+@media print {
+  body { background: #fff; }
+  #root { padding: 0; }
+  .toolbar { display: none; }
+  .g-doc { width: auto; margin: 0; padding: 0; box-shadow: none; }
+  .g-cover { min-height: 0; height: 255mm; break-after: page; }
+  .g-cat { break-before: page; }
+  a { color: inherit; text-decoration: none; }
+}
