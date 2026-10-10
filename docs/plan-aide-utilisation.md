@@ -326,12 +326,13 @@ Définition de « terminé » pour P1 : tests verts (`npm run test:all`), FR/AR 
 |---|---|---|
 | **P0 — Plan éditorial** *(ce document)* | Inventaire, chartes, specs | ~0,5 j (fait) |
 | **P1 — MVP Centre d'aide** | `help-content.js` (démarrage + 10 écrans + tâches P1 + FAQ + glossaire), `help.js/css`, `?`+`F1`, recherche, i18n, tests | ~3–4 j |
-| **P2 — Onboarding** | Parcours 5 étapes + checklist « mise en route » | ~2–3 j |
-| **P3 — Guide PDF** | Génération depuis la source + aide-mémoire | ~1–2 j |
+| **P2 — Onboarding** | Parcours 5 étapes + checklist « mise en route » | ~2–3 j (**fait — v1.20.0**) |
+| **P3 — Guide PDF** | Génération depuis la source + aide-mémoire | ~1–2 j (**fait — v1.21.0**) |
 | **P4 — Vidéos & FAQ+** | 8 screencasts, compléments FAQ | ~3–5 j |
 | **P5 — Maintenance** | MAJ à chaque version, captures/vidéos, parité | continu |
 
 Ordre recommandé : **P1 → P2 → P3 → P4**, chaque phase restant livrable et testée indépendamment.
+État : **P0, P1 (v1.19.0), P2 (v1.20.0) et P3 (v1.21.0) livrés** ; reste **P4** (vidéos) et la maintenance.
 
 ---
 
